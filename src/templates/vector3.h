@@ -310,7 +310,7 @@ template <class T> class Vec3 : public Serialisable<typename SerialisableContext
     // Normalise the vector to unity
     void normalise()
     {
-        double mag = sqrt(x * x + y * y + z * z);
+        auto mag = sqrt(x * x + y * y + z * z);
         if (mag < 1.0E-8)
             zero();
         else
@@ -319,6 +319,12 @@ template <class T> class Vec3 : public Serialisable<typename SerialisableContext
             y /= mag;
             z /= mag;
         }
+    }
+    // Return the normalised vector
+    Vec3<double> normalised()
+    {
+        auto mag = sqrt(x * x + y * y + z * z);
+        return {x / mag, y / mag, z / mag};
     }
     // Returns an orthogonal, normalised unit vector
     Vec3<T> orthogonal() const
