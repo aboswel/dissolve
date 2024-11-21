@@ -80,7 +80,7 @@ sudo pkill nix-daemon
 ## Setting up the environment
 
 If you have not done so already, close your terminal and start a new
-session. The [*nix installer*]({{< ref "idaaas#install-nix" >}}) does
+session. The [*nix installer*]({{< ref "nix#install-nix" >}}) does
 not take full effect until you start a fresh session.
 
 ### Upgrade `git`
@@ -137,6 +137,14 @@ message about building `qtbase`. If so, go grab a cup of tea.
 This means that one of our custom libraries hasn't been properly pulled
 from cache and it will need some time to compile. Thankfully, this will
 only ever need to happen once.
+
+### Download the Submodules
+
+We now need to download the git submodules.
+
+``` shell
+git submodule update --init --recursive
+```
 
 ### Build Dissolve
 
