@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #pragma once
 
@@ -42,8 +42,8 @@ class GeneratorNodeRegistry
     {
         // Check for duplicate node type
         if (producers_.find(nodeType) != producers_.end())
-            throw(std::runtime_error(
-                fmt::format("A node producer for type '{}' already exists.\n", GeneratorNode::nodeTypes().keyword(nodeType))));
+            Messenger::exception("A node producer for type '{}' already exists.\n",
+                                 GeneratorNode::nodeTypes().keyword(nodeType));
 
         producers_.emplace(nodeType, GeneratorNodeRegistryData([]() { return std::make_shared<N>(); }, brief));
 

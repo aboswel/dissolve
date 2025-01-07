@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include <utility>
 
@@ -45,9 +45,9 @@ void AtomTypeData::setIsotope(Sears91::Isotope tope, double pop, double fraction
 {
     if (std::find_if(isotopes_.begin(), isotopes_.end(), [tope](const auto &topeData) { return topeData.isotope() == tope; }) !=
         isotopes_.end())
-        throw(std::runtime_error(fmt::format(
+        Messenger::exception(
             "Tried to set IsotopeData for isotope A = {} in AtomTypeData for AtomType '{}', but existing data is present.\n",
-            tope, Sears91::A(tope), atomTypeName())));
+            Sears91::A(tope), atomTypeName());
 
     isotopes_.emplace_back(tope, pop, fraction);
 

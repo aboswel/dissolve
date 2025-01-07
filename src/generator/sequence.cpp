@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/sequence.h"
 #include "base/lineParser.h"
@@ -37,13 +37,13 @@ void GeneratorNodeSequence::appendNode(NodeRef node, std::optional<int> insertAt
     if (node->name().empty())
     {
         auto n = 1;
-        while (nodeExists(fmt::format("{}{:02d}", GeneratorNode::nodeTypes().keyword(node->type()), n)))
+        while (nodeExists(std::format("{}{:02d}", GeneratorNode::nodeTypes().keyword(node->type()), n)))
             ++n;
-        node->setName(fmt::format("{}{:02d}", GeneratorNode::nodeTypes().keyword(node->type()), n));
+        node->setName(std::format("{}{:02d}", GeneratorNode::nodeTypes().keyword(node->type()), n));
     }
     else if (nodeExists(node->name()))
-        throw(std::runtime_error(
-            fmt::format("Can't have duplicate node names in the same procedure - node '{}' already exists.\n", node->name())));
+        Messenger::exception("Can't have duplicate node names in the same procedure - node '{}' already exists.\n",
+                             node->name());
 
     if (insertAtIndex)
         sequence_.insert(sequence_.begin() + *insertAtIndex, node);
@@ -363,8 +363,8 @@ bool GeneratorNodeSequence::check() const
     {
         // Check ownership
         if (&node->scope()->get() != this)
-            return Messenger::error("Node '{}' failed parent check ({} is not this {})\n", node->name(),
-                                    fmt::ptr(node->parent()), fmt::ptr(this));
+            Messenger::exception("Node '{}' failed parent check ({} is not this {})\n", node->name(),
+                                 static_cast<const void *>(node->parent()), static_cast<const void *>(this));
 
         // Check node branch if present
         if (node->branch() && !node->branch()->get().check())
@@ -425,7 +425,7 @@ std::string_view GeneratorNodeSequence::blockKeyword() const { return blockKeywo
 // Read structure from specified LineParser
 bool GeneratorNodeSequence::deserialise(LineParser &parser, const CoreData &coreData)
 {
-    const auto blockTerminationKeyword = fmt::format("End{}", blockKeyword_);
+    const auto blockTerminationKeyword = std::format("End{}", blockKeyword_);
 
     // Read until we encounter the block-ending keyword, or we fail for some reason
     auto errorsEncountered = false;

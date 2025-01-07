@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "items/serialisers.h"
 #include "base/lineParser.h"
@@ -31,7 +31,7 @@ GenericItemSerialiser::GenericItemSerialiser()
     registerSerialiser<std::string>([](const std::any &a, LineParser &parser)
                                     { return parser.writeLineF("{}\n", std::any_cast<std::string>(a)); });
     registerSerialiser<std::streampos>([](const std::any &a, LineParser &parser)
-                                       { return parser.writeLineF("{}\n", std::any_cast<std::streampos>(a)); });
+                                       { return parser.writeLineF("{}\n", (std::size_t)(std::any_cast<std::streampos>(a))); });
     registerSerialiser<std::vector<double>>(
         [](const std::any &a, LineParser &parser)
         {
@@ -159,8 +159,8 @@ bool GenericItemSerialiser::serialiseObject(const std::any &a, LineParser &parse
     // Find a suitable serialiser and call it
     auto it = serialisers_.find(a.type());
     if (it == serialisers_.end())
-        throw(std::runtime_error(fmt::format(
-            "Item of type '{}' cannot be serialised as no suitable serialiser has been registered.\n", a.type().name())));
+        Messenger::exception("Item of type '{}' cannot be serialised as no suitable serialiser has been registered.\n",
+                             a.type().name());
 
     return (it->second)(a, parser);
 }

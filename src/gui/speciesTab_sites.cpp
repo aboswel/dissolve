@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "gui/gui.h"
 #include "gui/speciesTab.h"
@@ -135,7 +135,7 @@ void SpeciesTab::on_SiteFragmentDescriptionEdit_returnPressed() { on_SiteFragmen
 
 std::string siteName(const SpeciesAtom &i)
 {
-    return i.atomType() ? fmt::format("{} [{}]", i.index() + 1, i.atomType()->name()) : fmt::format("{}", i.index() + 1);
+    return i.atomType() ? std::format("{} [{}]", i.index() + 1, i.atomType()->name()) : std::format("{}", i.index() + 1);
 }
 
 // Update sites tab

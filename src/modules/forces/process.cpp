@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "base/lineParser.h"
 #include "base/sysFunc.h"
@@ -39,7 +39,7 @@ Module::ExecutionResult ForcesModule::process(ModuleContext &moduleContext)
 
     // Realise the force vector
     auto &f = moduleContext.dissolve().processingModuleData().realise<std::vector<Vec3<double>>>(
-        fmt::format("{}//Forces", targetConfiguration_->niceName()), name());
+        std::format("{}//Forces", targetConfiguration_->niceName()), name());
     f.resize(targetConfiguration_->nAtoms());
 
     // Calculate forces

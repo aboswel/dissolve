@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/addOnSphere.h"
 #include "base/randomBuffer.h"
@@ -123,8 +123,7 @@ bool AddOnSphereGeneratorNode::execute(const GeneratorContext &generatorContext)
         case (AddGeneratorNode::PositioningType::Current):
             break;
         default:
-            throw(std::runtime_error(
-                fmt::format("Positioning type {} not handled.\n", positioningTypes().keyword(positioningType_))));
+            Messenger::exception("Positioning type {} not handled.\n", positioningTypes().keyword(positioningType_));
     }
 
     // Add space for the new molecules

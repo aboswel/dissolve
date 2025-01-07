@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "classes/configuration.h"
 #include "main/dissolve.h"
@@ -92,7 +92,7 @@ Module::ExecutionResult SQModule::process(ModuleContext &moduleContext)
     // Is the PartialSet already up-to-date?
     if (DissolveSys::sameString(
             unweightedsq.fingerprint(),
-            fmt::format("{}/{}", moduleContext.dissolve().processingModuleData().version("UnweightedGR", sourceGR_->name()),
+            std::format("{}/{}", moduleContext.dissolve().processingModuleData().version("UnweightedGR", sourceGR_->name()),
                         sourceBragg_
                             ? moduleContext.dissolve().processingModuleData().version("Reflections", sourceBragg_->name())
                             : -1)))
@@ -224,7 +224,7 @@ Module::ExecutionResult SQModule::process(ModuleContext &moduleContext)
     }
 
     // Set fingerprint
-    unweightedsq.setFingerprint(fmt::format(
+    unweightedsq.setFingerprint(std::format(
         "{}/{}", moduleContext.dissolve().processingModuleData().version("UnweightedGR", sourceGR_->name()),
         sourceBragg_ ? moduleContext.dissolve().processingModuleData().version("Reflections", sourceBragg_->name()) : -1));
 

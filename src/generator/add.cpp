@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/add.h"
 #include "base/randomBuffer.h"
@@ -163,8 +163,7 @@ bool AddGeneratorNode::execute(const GeneratorContext &generatorContext)
             case (AddGeneratorNodeBase::PositioningType::Current):
                 break;
             default:
-                throw(std::runtime_error(
-                    fmt::format("Positioning type {} not handled.\n", positioningTypes().keyword(positioningType_))));
+                Messenger::exception("Positioning type {} not handled.\n", positioningTypes().keyword(positioningType_));
         }
 
         // Generate and apply a random rotation matrix

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "gui/nodeControlWidget.h"
 #include "gui/gui.h"
@@ -26,7 +26,8 @@ NodeControlWidget::NodeControlWidget(DissolveWindow *dissolveWindow, NodeRef nod
     {
         // We can only display a single section of widgets at present
         if (node_->keywords().sections().size() > 1)
-            Messenger::warn("There are {} keyword sections defined, but only one can be displayed. Tell the developer!\n");
+            Messenger::warn("There are {} keyword sections defined, but only one can be displayed. Tell the developer!\n",
+                            node_->keywords().sections().size());
 
         ui_.NodeKeywordsWidget->setUp(node_->keywords().sections().front(), dissolve_.coreData());
     }

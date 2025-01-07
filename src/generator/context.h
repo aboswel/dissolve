@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #pragma once
 
+#include "base/messenger.h"
 #include "templates/optionalRef.h"
-#include <fmt/format.h>
+#include <format>
 #include <stdexcept>
 #include <string>
 
@@ -47,8 +48,7 @@ class GeneratorContext
     // Catch any unrecognised object type
     template <class T> void set(T obj)
     {
-        throw(std::runtime_error(
-            fmt::format("Invalid object type ({}) passed to GeneratorContext set().\n", typeid(obj).name())));
+        Messenger::exception("Invalid object type ({}) passed to GeneratorContext set().\n", typeid(obj).name());
     }
 
     public:

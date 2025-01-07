@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/registry.h"
 #include "generator/add.h"
@@ -95,9 +95,8 @@ std::shared_ptr<GeneratorNode> GeneratorNodeRegistry::produce(GeneratorNode::Nod
 {
     auto it = producers_.find(nodeType);
     if (it == producers_.end())
-        throw(std::runtime_error(
-            fmt::format("A producer has not been registered for node type '{}', so a new instance cannot be created.\n",
-                        GeneratorNode::nodeTypes().keyword(nodeType))));
+        Messenger::exception("A producer has not been registered for node type '{}', so a new instance cannot be created.\n",
+                             GeneratorNode::nodeTypes().keyword(nodeType));
 
     return (it->second.first)();
 }
