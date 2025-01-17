@@ -1,32 +1,20 @@
-name: Continuous
+name: Detect Release
+description: Runs on any merged release PR (actioned by prepare_release.yml)
 
 on:
-  push:
-    branches:
-    - 'develop'
-    paths-ignore:
-    - '.github/workflows/benchmark.yml'
-    - '.github/workflows/cacheConan.yml'
-    - '.github/workflows/cacheNix.yml'
-    - '.github/workflows/issues.yml'
-    - '.github/workflows/pr.yml'
-    - '.github/workflows/release.yml'
-    - '.github/workflows/web**'
-    - '.github/ISSUE_TEMPLATE/**'
-    - 'web/**'
-    - 'README.md'
+  pull_request:
+    types:
+      - closed
 
 jobs:
 
   Checkout:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, '[Release]')
     uses: "./.github/workflows/_checkout.yml"
+    secrets: inherit
     with:
-      bump: true
-      publishType: 'continuous'
-
-  QC:
-    needs: [Checkout]
-    uses: "./.github/workflows/_qc.yml"
+      checkoutRef: ${{ github.event.pull_request.merge_commit_sha }}
+      publishType: 'release'
 
   BuildAndPackage:
     needs: [Checkout]
@@ -42,7 +30,7 @@ jobs:
     needs: [Checkout]
     uses: "./.github/workflows/_website.yml"
     with:
-      publishType: 'continuous'
+      publishType: 'release'
       displayMajorVersion: ${{ needs.Checkout.outputs.majorVersion }}
       displayMinorVersion: ${{ needs.Checkout.outputs.minorVersion }}
     secrets: inherit
@@ -51,8 +39,8 @@ jobs:
     needs: [Checkout,BuildAndPackage,Web]
     uses: "./.github/workflows/_publish.yml"
     with:
-      publishType: 'continuous'
-      releaseTag: 'continuous'
-      releaseName: "Development Release ${{ needs.Checkout.outputs.currentVersion }} @ ${{ needs.Checkout.outputs.currentShortHash }}"
-      releaseBodyFile: ./ChangeLog.md
+      publishType: 'release'
+      releaseTag: ${{ needs.Checkout.outputs.currentVersion }}
+      releaseName: "Release ${{ needs.Checkout.outputs.currentVersion }}"
+      releaseBody: ${{ github.event.pull_request.body }}
     secrets: inherit
