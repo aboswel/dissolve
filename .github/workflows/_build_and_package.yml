@@ -19,6 +19,12 @@ on:
       nixHash:
         type: string
         required: true
+      benchmark:
+        type: boolean
+        default: false
+      publishBenchmarks:
+        type: boolean
+        default: false
 
 jobs:
 
@@ -67,6 +73,8 @@ jobs:
         target: ${{ matrix.target }}
         currentVersion: ${{ inputs.currentVersion }}
         nixHash: ${{ inputs.nixHash }}
+        benchmark: ${{ inputs.benchmark }}
+        publishBenchmarks: ${{ inputs.publishBenchmarks }}
 
   Package:
     needs: Build

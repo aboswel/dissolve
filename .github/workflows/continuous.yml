@@ -5,15 +5,12 @@ on:
     branches:
     - 'develop'
     paths-ignore:
-    - '.github/workflows/benchmark.yml'
     - '.github/workflows/cacheConan.yml'
     - '.github/workflows/cacheNix.yml'
     - '.github/workflows/issues.yml'
     - '.github/workflows/pr.yml'
     - '.github/workflows/release.yml'
-    - '.github/workflows/web**'
     - '.github/ISSUE_TEMPLATE/**'
-    - 'web/**'
     - 'README.md'
 
 jobs:
@@ -27,16 +24,21 @@ jobs:
   QC:
     needs: [Checkout]
     uses: "./.github/workflows/_qc.yml"
+    with:
+      nixHash: ${{ needs.Checkout.outputs.nixHash }}
 
   BuildAndPackage:
     needs: [Checkout]
     uses: "./.github/workflows/_build_and_package.yml"
     with:
+      benchmark: true
+      publishBenchmarks: true
       currentVersion: ${{ needs.Checkout.outputs.currentVersion }}
       qtVersion: ${{ needs.Checkout.outputs.qtVersion }}
       antlrVersion: ${{ needs.Checkout.outputs.antlrVersion }}
       conanHash: ${{ needs.Checkout.outputs.conanHash }}
       nixHash: ${{ needs.Checkout.outputs.nixHash }}
+    secrets: inherit
 
   Web:
     needs: [Checkout]

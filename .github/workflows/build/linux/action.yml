@@ -12,6 +12,12 @@ inputs:
   nixHash:
     type: string
     required: true
+  benchmark:
+    type: boolean
+    default: false
+  publishBenchmarks:
+    type: boolean
+    default: false
 
 runs:
   using: "composite"
@@ -104,6 +110,31 @@ runs:
       # Assemble artifacts
       mkdir packages-binary
       cp -v binary packages-binary/${{ inputs.target }}-${{ inputs.currentVersion }}
+
+  - name: Run benchmarks
+    if: inputs.benchmark == 'true'
+    shell: bash
+    run: |
+      set -ex
+      export LD_LIBRARY_PATH=`pwd`/build/onetbb/lib
+
+      nix build -L .#benchmarks
+      rm result
+      nix run -L .#benchmarks > all_benchmark_results.json
+
+      cat all_benchmark_results.json
+
+  - name: Store benchmark result
+    uses: rhysd/github-action-benchmark@v1
+    if: inputs.publishBenchmarks == 'true' && inputs.benchmark == 'true'
+    with:
+      tool: 'googlecpp'
+      output-file-path: all_benchmark_results.json
+      github-token: ${{ github.token }}
+      auto-push: true
+      comment-on-alert: true
+      alert-threshold: '200%'
+      alert-comment-cc-users: '@disorderedmaterials/dissolve-devs'
 
   - name: Tidy nix Store
     if: ${{ inputs.cacheOnly == 'true' }}

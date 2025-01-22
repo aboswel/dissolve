@@ -22,6 +22,12 @@ inputs:
   nixHash:
     type: string
     default: 'UNKNOWN'
+  benchmark:
+    type: boolean
+    default: false
+  publishBenchmarks:
+    type: boolean
+    default: false
 
 runs:
   using: "composite"
@@ -35,6 +41,8 @@ runs:
       cacheOnly: ${{ inputs.cacheOnly }}
       currentVersion: ${{ inputs.currentVersion }}
       nixHash: ${{ inputs.nixHash }}
+      benchmark: ${{ inputs.benchmark && inputs.target == 'dissolve' }}
+      publishBenchmarks: ${{ inputs.publishBenchmarks && inputs.target == 'dissolve' }}
 
   - name: Build (OSX)
     if: runner.os == 'MacOS'
