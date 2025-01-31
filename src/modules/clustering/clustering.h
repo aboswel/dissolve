@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2024 Team Dissolve and contributors
+
+// Define the main clustering class to store user defined parameters and analysis settings, as well as function prototypes and helper methods
+// clustering.h
+#pragma once
+
+#include "module/module.h"
+#include "module/context.h"
+
+// Clustering Module
+class ClusteringModule : public Module
+{
+    public:
+    ClusteringModule();
+    ~ClusteringModule() override = default;
+
+    /*
+     * Definition
+     */
+    private:
+    // Target configurations
+    Configuration *targetConfiguration_{nullptr};
+    // Simulation data...
+    // Need to retrieve all the species in a configuration, then iterate through them to get the sites. Site combinations are then selected in the gui
+    // Need a struct which contains all the user specified info for the intermolecular bonding
+    
+    struct BondInfo {
+    std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site1_;
+    std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site2_;
+    double cutOff;
+    
+        BondInfo(std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site1,
+             std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site2,
+             double cut)
+        : site1_(site1), site2_(site2), cutOff(cut) {}
+    };
+    // Vector of intermolecular bonds specified
+    std::vector<BondInfo> selectedBonds;
+
+    /*
+     * Processing
+     */
+    public:
+    // Set up module for processing
+    // bool setUp();
+
+    private:
+    // Run main processing
+    Module::ExecutionResult process(ModuleContext &moduleContext) override;
+};
