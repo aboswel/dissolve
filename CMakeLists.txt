@@ -23,6 +23,9 @@ set(CMAKE_CXX_STANDARD 20)
 # Add our custom module search path
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules")
 
+# We are setting up a development environment in MSVC
+option(MSVC_DEV "Configuration is for a Visual Studio 2022 dev environment" OFF)
+
 # Install GSL (GNU Scientific Library) with Conan for Windows and Unix-like systems
 option(CONAN_GSL "Use conan to find GSL" ON)
 
@@ -415,3 +418,9 @@ if(GUI)
   )
   install(SCRIPT ${deploy_script})
 endif(GUI)
+
+# Install for MSVC
+if(MSVC_DEV)
+  include(msvc-dissolve-dev)
+  setup_msvc()
+endif(MSVC_DEV)
