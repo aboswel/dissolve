@@ -113,7 +113,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         const Analyser::SiteVector& siteVectorB = selectionB.sites();
 
         SiteFilter filter(targetConfiguration_, siteVectorA);
-        auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 10);
+        auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 100);
 
         // Open output file
         if (!parser.openOutput(filename))
@@ -133,15 +133,19 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         // Write data for each filtered site and its neighbours
         for (const auto& [site, neighbours] : neighbourMap)
         {
-            parser.writeLineF("Site '{}': {} neighbours\n", 
+            parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                         site->parent()->name(), 
+                        site->uniqueSiteIndex().value_or(-1),
+                        site->origin().x, site->origin().y, site->origin().z,
                         neighbours.size());
             
-            for (const auto& [neighbour, distance] : neighbours)
+            for (const auto& [neighbour, index] : neighbours)
             {
-                parser.writeLineF("  Neighbour '{}': distance = {}\n", 
+                parser.writeLineF("  Neighbour '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : distance = {}\n", 
                                 neighbour->parent()->name(), 
-                                distance);
+                                index,
+                                neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
+                                targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
             }
         }
     }
