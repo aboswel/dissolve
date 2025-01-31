@@ -5,27 +5,59 @@ on:
     branches:
     - 'develop'
     paths-ignore:
-    - '.github/workflows/benchmark.yml'
     - '.github/workflows/cacheConan.yml'
     - '.github/workflows/cacheNix.yml'
     - '.github/workflows/issues.yml'
     - '.github/workflows/pr.yml'
     - '.github/workflows/release.yml'
-    - '.github/workflows/web**'
     - '.github/ISSUE_TEMPLATE/**'
-    - 'web/**'
     - 'README.md'
 
 jobs:
 
-  BuildAndPackage:
-    uses: "./.github/workflows/_build_and_package.yml"
+  Checkout:
+    uses: "./.github/workflows/_checkout.yml"
+    with:
+      bump: true
+      publishType: 'continuous'
 
-  Publish:
-    needs: [BuildAndPackage]
-    uses: "./.github/workflows/_publishing.yml"
+  QC:
+    needs: [Checkout]
+    uses: "./.github/workflows/_qc.yml"
+    with:
+      nixHash: ${{ needs.Checkout.outputs.nixHash }}
+
+  BuildAndPackage:
+    needs: [Checkout]
+    uses: "./.github/workflows/_build_and_package.yml"
+    with:
+      benchmark: true
+      publishBenchmarks: true
+      currentVersion: ${{ needs.Checkout.outputs.currentVersion }}
+      qtVersion: ${{ needs.Checkout.outputs.qtVersion }}
+      antlrVersion: ${{ needs.Checkout.outputs.antlrVersion }}
+      conanHash: ${{ needs.Checkout.outputs.conanHash }}
+      nixHash: ${{ needs.Checkout.outputs.nixHash }}
+    secrets: inherit
+
+  Web:
+    needs: [Checkout]
+    uses: "./.github/workflows/_website.yml"
     with:
       publishType: 'continuous'
-    secrets:
-      HARBOR_USER: ${{ secrets.HARBOR_USER }}
-      HARBOR_SECRET: ${{ secrets.HARBOR_SECRET }}
+      displayMajorVersion: ${{ needs.Checkout.outputs.majorVersion }}
+      displayMinorVersion: ${{ needs.Checkout.outputs.minorVersion }}
+      hugoVersion: ${{ needs.Checkout.outputs.hugoVersion }}
+    secrets: inherit
+
+  Publish:
+    needs: [Checkout,BuildAndPackage,Web]
+    uses: "./.github/workflows/_publish.yml"
+    with:
+      publishType: 'continuous'
+      currentVersion: ${{ needs.Checkout.outputs.currentVersion }}
+      releaseTag: 'continuous'
+      releaseName: "Development Release ${{ needs.Checkout.outputs.currentVersion }} @ ${{ needs.Checkout.outputs.currentShortHash }}"
+      releaseBodyFile: ./ChangeLog.md
+      apptainerVersion: ${{ needs.Checkout.outputs.apptainerVersion }}
+    secrets: inherit

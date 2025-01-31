@@ -18,10 +18,13 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 cmake_policy(SET CMP0020 NEW)
 
 # Request C++17 Standard Support (Required for std::optional and auto types in lambda parameters)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # Add our custom module search path
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules")
+
+# We are setting up a development environment in MSVC
+option(MSVC_DEV "Configuration is for a Visual Studio 2022 dev environment" OFF)
 
 # Install GSL (GNU Scientific Library) with Conan for Windows and Unix-like systems
 option(CONAN_GSL "Use conan to find GSL" ON)
@@ -45,9 +48,6 @@ endif(CONAN)
 
 # Find core dependencies
 set(CORE_LINK_LIBS "")
-find_package(fmt REQUIRED)
-include_directories(${fmt_INCLUDE_DIRS})
-add_compile_definitions(FMT_HEADER_ONLY)
 find_package(CLI11 REQUIRED)
 include_directories(${CLI11_INCLUDE_DIRS})
 find_package(toml11 REQUIRED)
@@ -131,7 +131,7 @@ if(GUI)
                3DExtras
                QuickWidgets
                QuickControls2
-               REQUIRED
+    REQUIRED
   )
 
   # Make sure we enable automated handling of Qt files
@@ -158,6 +158,13 @@ if(WIN32)
     include_directories(${FTGL_INCLUDE_DIRS})
   endif(GUI)
 
+  # Format requires on MSVC std:c++latest, so we have to ask for C++23, despite the fact it's part of the C++20 standard.
+  set(CMAKE_CXX_STANDARD 23)
+
+  # By default, Visual Studio lies about what C++ version it's using unless you pass it a flag to tell it not to lie.  This breaks the
+  # TOML11 library, since it checks to C++ version to see if `std::result_of` has been deprecated.
+  add_definitions(/Zc:__cplusplus)
+
   # Add defines for Windows systems - NOMINMAX to prevent conflicts with std::min() and std::max() - NOGDI to prevent conflicts arising from
   # Windows defining ERROR as a global macro (used in ANTLR4)
   add_definitions(-DNOMINMAX -DNOGDI)
@@ -179,6 +186,7 @@ endif(UNIX)
 
 # -- OSX
 if(APPLE)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
 
   list(APPEND CMAKE_BUILD_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
   # Set some specific C++11 related options here (set_property below does not seem to persist)
@@ -410,3 +418,9 @@ if(GUI)
   )
   install(SCRIPT ${deploy_script})
 endif(GUI)
+
+# Install for MSVC
+if(MSVC_DEV)
+  include(msvc-dissolve-dev)
+  setup_msvc()
+endif(MSVC_DEV)

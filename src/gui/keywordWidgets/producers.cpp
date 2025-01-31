@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "gui/keywordWidgets/producers.h"
 #include "gui/keywordWidgets/atomTypeVector.h"
@@ -99,9 +99,9 @@ std::pair<QWidget *, KeywordWidgetBase *> KeywordWidgetProducer::produce(Keyword
 {
     auto it = producers_.find(keyword->typeIndex());
     if (it == producers_.end())
-        throw(std::runtime_error(fmt::format("A producer has not been registered for type '{}' (keyword name is '{}'), so a "
-                                             "new widget for this keyword cannot be created.\n",
-                                             keyword->typeIndex().name(), keyword->name())));
+        Messenger::exception("A producer has not been registered for type '{}' (keyword name is '{}'), so a "
+                             "new widget for this keyword cannot be created.\n",
+                             keyword->typeIndex().name(), keyword->name());
 
     return (it->second)(keyword, coreData);
 }

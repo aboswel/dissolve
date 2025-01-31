@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/addPair.h"
 #include "base/randomBuffer.h"
@@ -130,8 +130,8 @@ bool AddPairGeneratorNode::execute(const GeneratorContext &generatorContext)
             case (AddGeneratorNodeBase::PositioningType::Current):
                 break;
             default:
-                throw(std::runtime_error(fmt::format("Positioning type {} not handled.\n",
-                                                     AddGeneratorNodeBase::positioningTypes().keyword(positioningType_))));
+                Messenger::exception("Positioning type {} not handled.\n",
+                                     AddGeneratorNodeBase::positioningTypes().keyword(positioningType_));
         }
 
         // Move the molecule pair

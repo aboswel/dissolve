@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "math/interpolator.h"
 #include "math/data1D.h"
 #include <algorithm>
 #include <benchmark/benchmark.h>
+#include <numeric>
 #include <random>
 #include <vector>
 

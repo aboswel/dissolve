@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "keywords/nodeBranch.h"
 #include "base/lineParser.h"
@@ -35,7 +35,7 @@ bool NodeBranchKeyword::serialise(LineParser &parser, std::string_view keywordNa
         return false;
 
     // Write branch information
-    if (!data_.serialise(parser, fmt::format("{}  ", prefix)))
+    if (!data_.serialise(parser, std::format("{}  ", prefix)))
         return false;
 
     // Write end keyword based on the name

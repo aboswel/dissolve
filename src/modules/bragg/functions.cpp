@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "classes/atom.h"
 #include "classes/box.h"
@@ -352,7 +352,7 @@ bool BraggModule::formReflectionFunctions(GenericList &moduleData, const Process
                             {
                                 // Retrieve partial container and make sure its tag is set
                                 auto &partial = braggPartials[{typeI, typeJ}];
-                                partial.setTag(fmt::format("{}-{}", atd1.atomTypeName(), atd2.atomTypeName()));
+                                partial.setTag(std::format("{}-{}", atd1.atomTypeName(), atd2.atomTypeName()));
 
                                 // Loop over defined Bragg reflections
                                 for (auto n = 0; n < nReflections; ++n)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "keywords/generator.h"
 #include "base/lineParser.h"
@@ -40,7 +40,7 @@ bool GeneratorKeyword::serialise(LineParser &parser, std::string_view keywordNam
         return false;
 
     // Increase the indent
-    std::string newPrefix = fmt::format("{}  ", prefix);
+    std::string newPrefix = std::format("{}  ", prefix);
 
     // Write the node data
     if (!data_.serialise(parser, newPrefix))

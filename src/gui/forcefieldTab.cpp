@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "gui/forcefieldTab.h"
 #include "classes/atomType.h"
@@ -500,12 +500,12 @@ void ForcefieldTab::pairPotentialSelectionChanged(const QItemSelection &current,
         return;
 
     ui_.PairPotentialsPlotWidget->dataViewer()->createRenderable<RenderableData1D>(
-        pp->shortRangePotential(), fmt::format("Short Range {}-{}", pp->nameI(), pp->nameJ()));
+        pp->shortRangePotential(), std::format("Short Range {}-{}", pp->nameI(), pp->nameJ()));
     ui_.PairPotentialsPlotWidget->dataViewer()
-        ->createRenderable<RenderableData1D>(pp->coulombPotential(), fmt::format("Coulomb {}-{}", pp->nameI(), pp->nameJ()))
+        ->createRenderable<RenderableData1D>(pp->coulombPotential(), std::format("Coulomb {}-{}", pp->nameI(), pp->nameJ()))
         ->setColour(StockColours::BlueStockColour);
     ui_.PairPotentialsPlotWidget->dataViewer()
-        ->createRenderable<RenderableData1D>(pp->derivative(), fmt::format("Derivative {}-{}", pp->nameI(), pp->nameJ()))
+        ->createRenderable<RenderableData1D>(pp->derivative(), std::format("Derivative {}-{}", pp->nameI(), pp->nameJ()))
         ->setColour(StockColours::RedStockColour);
 }
 

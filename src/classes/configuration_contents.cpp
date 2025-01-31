@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "classes/atomType.h"
 #include "classes/box.h"
@@ -35,8 +35,7 @@ void Configuration::adjustSpeciesPopulation(const Species *sp, int delta)
     if (it == speciesPopulations_.end())
     {
         if (delta < 0)
-            throw(std::runtime_error(
-                fmt::format("Can't decrease population of Species '{}' as it is not in the list.\n", sp->name())));
+            Messenger::exception("Can't decrease population of Species '{}' as it is not in the list.\n", sp->name());
         speciesPopulations_.emplace_back(sp, delta);
     }
     else

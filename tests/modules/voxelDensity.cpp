@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "modules/voxelDensity/voxelDensity.h"
 #include "classes/atom.h"
@@ -59,9 +59,9 @@ class VoxelDensityModuleTest : public ::testing::Test
         int Z;
         VoxelDensityModule *modules[2];
         Water(VoxelDensityModuleTest &test)
-            : boxSideLength(20.0083), mass(18.015),
-              Z(10), modules{test.systemTest.getModule<VoxelDensityModule>("VoxelDensity(Mass)"),
-                             test.systemTest.getModule<VoxelDensityModule>("VoxelDensity(AtomicNumber)")}
+            : boxSideLength(20.0083), mass(18.015), Z(10),
+              modules{test.systemTest.getModule<VoxelDensityModule>("VoxelDensity(Mass)"),
+                      test.systemTest.getModule<VoxelDensityModule>("VoxelDensity(AtomicNumber)")}
         {
         }
     };
@@ -103,7 +103,7 @@ TEST_F(VoxelDensityModuleTest, Mass)
         auto nAxisVoxels = DissolveMath::power(2, 3 - start);
         const auto &data1D = systemTest.dissolve()
                                  .processingModuleData()
-                                 .search<const Data1D>(fmt::format("Mass({}-bin)//Data1D", nAxisVoxels))
+                                 .search<const Data1D>(std::format("Mass({}-bin)//Data1D", nAxisVoxels))
                                  ->get();
         auto maxBin = DissolveLimits::maxValueAt<double>(const_cast<Data1D *>(&data1D)->values());
         auto binRange = module->keywords().get<Vec3<double>, Vec3DoubleKeyword>("BinRange");
@@ -138,7 +138,7 @@ TEST_F(VoxelDensityModuleTest, AtomicNumber)
         auto nAxisVoxels = DissolveMath::power(2, 3 - start);
         const auto &data1D = systemTest.dissolve()
                                  .processingModuleData()
-                                 .search<const Data1D>(fmt::format("Z({}-bin)//Data1D", nAxisVoxels))
+                                 .search<const Data1D>(std::format("Z({}-bin)//Data1D", nAxisVoxels))
                                  ->get();
         auto maxBin = DissolveLimits::maxValueAt<double>(const_cast<Data1D *>(&data1D)->values());
         auto binRange = module->keywords().get<Vec3<double>, Vec3DoubleKeyword>("BinRange");
@@ -173,7 +173,7 @@ TEST_F(VoxelDensityModuleTest, ScatteringLengthDensity)
         auto nAxisVoxels = DissolveMath::power(2, 3 - start);
         const auto &data1D = systemTest.dissolve()
                                  .processingModuleData()
-                                 .search<const Data1D>(fmt::format("ScatteringLengthDensity({}-bin)//Data1D", nAxisVoxels))
+                                 .search<const Data1D>(std::format("ScatteringLengthDensity({}-bin)//Data1D", nAxisVoxels))
                                  ->get();
         auto maxBin = DissolveLimits::maxValueAt<double>(const_cast<Data1D *>(&data1D)->values());
         auto binRange = module->keywords().get<Vec3<double>, Vec3DoubleKeyword>("BinRange");
@@ -197,7 +197,7 @@ TEST_F(VoxelDensityModuleTest, Water)
     auto moduleZ = consts.modules[1];
 
     const auto &data1DMass =
-        systemTest.dissolve().processingModuleData().search<const Data1D>(fmt::format("VoxelDensity(Mass)//Data1D"))->get();
+        systemTest.dissolve().processingModuleData().search<const Data1D>(std::format("VoxelDensity(Mass)//Data1D"))->get();
     auto maxBinMass = DissolveLimits::maxValueAt<double>(const_cast<Data1D *>(&data1DMass)->values());
     auto binWidthMass = (*moduleMass->keywords().get<Vec3<double>, Vec3DoubleKeyword>("BinRange")).z;
     EXPECT_EQ(maxBinMass.second, 1.0);
@@ -205,7 +205,7 @@ TEST_F(VoxelDensityModuleTest, Water)
 
     const auto &data1DZ = systemTest.dissolve()
                               .processingModuleData()
-                              .search<const Data1D>(fmt::format("VoxelDensity(AtomicNumber)//Data1D"))
+                              .search<const Data1D>(std::format("VoxelDensity(AtomicNumber)//Data1D"))
                               ->get();
     auto maxBinZ = DissolveLimits::maxValueAt<double>(const_cast<Data1D *>(&data1DZ)->values());
     auto binWidthZ = (*moduleZ->keywords().get<Vec3<double>, Vec3DoubleKeyword>("BinRange")).z;

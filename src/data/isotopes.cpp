@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "data/isotopes.h"
+#include "base/messenger.h"
 #include <algorithm>
-#include <fmt/format.h>
+#include <format>
 #include <stdexcept>
 
 namespace Sears91
@@ -467,7 +468,7 @@ Isotope isotope(Elements::Element Z, int A)
     auto it = std::find_if(sears91Data_.begin(), sears91Data_.end(),
                            [Z, A](const auto &topeData) { return topeData.Z() == Z && topeData.A() == A; });
     if (it == sears91Data_.end())
-        throw(std::runtime_error(fmt::format("No isotope with A = {} available for element {}.\n", A, Elements::symbol(Z))));
+        Messenger::exception("No isotope with A = {} available for element {}.\n", A, Elements::symbol(Z));
 
     return it->isotope();
 }
@@ -478,8 +479,7 @@ Isotope naturalIsotope(Elements::Element Z)
     auto it = std::find_if(sears91Data_.begin(), sears91Data_.end(),
                            [Z](const auto &topeData) { return topeData.Z() == Z && topeData.A() == 0; });
     if (it == sears91Data_.end())
-        throw(
-            std::runtime_error(fmt::format("No natural isotope information available for element {}.\n", Elements::symbol(Z))));
+        Messenger::exception("No natural isotope information available for element {}.\n", Elements::symbol(Z));
 
     return it->isotope();
 }

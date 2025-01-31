@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "generator/pickBase.h"
 #include "classes/configuration.h"
@@ -26,7 +26,7 @@ const std::vector<std::shared_ptr<Molecule>> &PickGeneratorNodeBase::moleculePoo
 // Return source molecule pool name
 std::string PickGeneratorNodeBase::moleculePoolName() const
 {
-    return selection_ ? fmt::format("picked selection '{}'", selection_->name()) : "configuration";
+    return selection_ ? std::format("picked selection '{}'", selection_->name()) : "configuration";
 }
 
 // Return vector of picked Molecules

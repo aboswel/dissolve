@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "base/lineParser.h"
 #include "base/sysFunc.h"
@@ -27,7 +27,7 @@ std::string exportFile(DissolveSystemTest &systemTest, std::string outfile,
 
     auto *cfg = systemTest.coreData().configuration(0);
 
-    auto output_path = fmt::format("{}/{}", DissolveSys::beforeLastChar(inputFile, '/'), outfile);
+    auto output_path = std::format("{}/{}", DissolveSys::beforeLastChar(inputFile, '/'), outfile);
     TrajectoryExportFileFormat exporter(output_path, format);
     EXPECT_TRUE(exporter.exportData(cfg));
 

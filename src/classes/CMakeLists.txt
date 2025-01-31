@@ -46,6 +46,7 @@ add_library(
   pairPotential.cpp
   pairPotentialOverride.cpp
   potentialMap.cpp
+  potentialSet.cpp
   pairIterator.cpp
   partialSet.cpp
   partialSetAccumulator.cpp
@@ -110,6 +111,7 @@ add_library(
   potentialMap.h
   partialSet.h
   partialSetAccumulator.h
+  potentialSet.h
   region.h
   regionalDistributor.h
   scatteringMatrix.h

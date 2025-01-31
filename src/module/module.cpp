@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "module/module.h"
 #include "base/lineParser.h"
@@ -144,7 +144,7 @@ std::string Module::frequencyDetails(int iteration) const
     if (nToGo == 1)
         return "next iteration";
 
-    return fmt::format("in {} steps time", nToGo);
+    return std::format("in {} steps time", nToGo);
 }
 
 // Set whether the Module is enabled

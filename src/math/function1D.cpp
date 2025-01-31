@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #define _USE_MATH_DEFINES
 #include "math/function1D.h"
@@ -508,7 +508,7 @@ std::string Function1DWrapper::parameterSummary() const
 {
     std::string summary;
     for (const auto &[name, p] : zip(function_.parameterNames(), parameters_))
-        summary += fmt::format("{}{} = {}", summary.empty() ? "" : ", ", name, p);
+        summary += std::format("{}{} = {}", summary.empty() ? "" : ", ", name, p);
     return summary;
 }
 

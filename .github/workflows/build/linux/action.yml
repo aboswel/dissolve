@@ -7,6 +7,17 @@ inputs:
   cacheOnly:
     type: boolean
     default: false
+  currentVersion:
+    type: string
+  nixHash:
+    type: string
+    required: true
+  benchmark:
+    type: boolean
+    default: false
+  publishBenchmarks:
+    type: boolean
+    default: false
 
 runs:
   using: "composite"
@@ -31,7 +42,7 @@ runs:
     id: nix-cache
     with:
       path: /tmp/nixcache
-      key: ${{ runner.os }}-${{ env.nixHash }}-nix-cache
+      key: ${{ runner.os }}-${{ inputs.nixHash }}-nix-cache
 
   - name: Import Nix Store Cache
     if: "steps.nix-cache.outputs.cache-hit == 'true'"
@@ -87,7 +98,7 @@ runs:
 
       # Assemble artifacts
       mkdir packages-sif
-      cp -v result packages-sif/${{ inputs.target }}-${{ env.dissolveVersion }}.sif
+      cp -v result packages-sif/${{ inputs.target }}-${{ inputs.currentVersion }}.sif
 
   - name: Bundle Executable
     shell: bash
@@ -98,7 +109,35 @@ runs:
 
       # Assemble artifacts
       mkdir packages-binary
-      cp -v binary packages-binary/${{ inputs.target }}-${{ env.dissolveVersion }}
+      cp -v binary packages-binary/${{ inputs.target }}-${{ inputs.currentVersion }}
+
+  - name: Run benchmarks
+    if: inputs.benchmark == 'true'
+    shell: bash
+    run: |
+      set -ex
+      export LD_LIBRARY_PATH=`pwd`/build/onetbb/lib
+
+      nix build -L .#benchmarks
+      rm result
+      nix run -L .#benchmarks > all_benchmark_results.json
+
+      cat all_benchmark_results.json
+
+      # Must reset to HEAD here otherwise the benchmark publishing step will (rightly) fail
+      git reset HEAD --hard
+
+  - name: Store benchmark result
+    uses: benchmark-action/github-action-benchmark@v1
+    if: inputs.publishBenchmarks == 'true' && inputs.benchmark == 'true'
+    with:
+      tool: 'googlecpp'
+      output-file-path: all_benchmark_results.json
+      github-token: ${{ github.token }}
+      auto-push: true
+      comment-on-alert: true
+      alert-threshold: '200%'
+      alert-comment-cc-users: '@disorderedmaterials/dissolve-devs'
 
   - name: Tidy nix Store
     if: ${{ inputs.cacheOnly == 'true' }}

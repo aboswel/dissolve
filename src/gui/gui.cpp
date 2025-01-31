@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "gui/gui.h"
 #include "base/lineParser.h"
@@ -321,7 +321,7 @@ void DissolveWindow::updateStatusBar()
     {
         statusLabel_->setText("Stopped");
         statusIndicator_->setPixmap(QPixmap(":/general/icons/true.svg"));
-        timerLabel_->setText(QString::fromStdString(fmt::format("Time elapsed: {}", elapsedTimer_.elapsedTimeString(true))));
+        timerLabel_->setText(QString::fromStdString(std::format("Time elapsed: {}", elapsedTimer_.elapsedTimeString(true))));
     }
     else if (ui_.MainStack->currentIndex() == 1)
     {
@@ -425,13 +425,13 @@ void DissolveWindow::updateWhileRunning(int iterationsRemaining)
     // Text is set to time elapsed if iterating indefinitely
     if (iterationsRemaining == -1)
     {
-        timerLabel_->setText(QString::fromStdString(fmt::format("Time elapsed: {}", elapsedTimer_.elapsedTimeString(true))));
+        timerLabel_->setText(QString::fromStdString(std::format("Time elapsed: {}", elapsedTimer_.elapsedTimeString(true))));
     }
     // Set ETA text if we can
     else
     {
         auto estimatedTime = dissolve_.estimateRequiredTime(iterationsRemaining);
-        timerLabel_->setText(estimatedTime ? QString::fromStdString(fmt::format(
+        timerLabel_->setText(estimatedTime ? QString::fromStdString(std::format(
                                                  "Time remaining: {}", Timer::timeString(estimatedTime.value(), false)))
                                            : defaultTimerText);
     }

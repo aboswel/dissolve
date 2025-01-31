@@ -7,14 +7,34 @@ on:
 
 jobs:
 
-  BuildAndPackage:
-    uses: "./.github/workflows/_build_and_package.yml"
+  Checkout:
+    uses: "./.github/workflows/_checkout.yml"
 
-  Publish:
-    needs: [BuildAndPackage]
-    uses: "./.github/workflows/_publishing.yml"
+  BuildAndPackage:
+    needs: [Checkout]
+    uses: "./.github/workflows/_build_and_package.yml"
+    with:
+      currentVersion: ${{ needs.Checkout.outputs.currentVersion }}
+      qtVersion: ${{ needs.Checkout.outputs.qtVersion }}
+      antlrVersion: ${{ needs.Checkout.outputs.antlrVersion }}
+      conanHash: ${{ needs.Checkout.outputs.conanHash }}
+      nixHash: ${{ needs.Checkout.outputs.nixHash }}
+
+  Web:
+    needs: [Checkout]
+    uses: "./.github/workflows/_website.yml"
     with:
       publishType: 'legacy'
-    secrets:
-      HARBOR_USER: ${{ secrets.HARBOR_USER }}
-      HARBOR_SECRET: ${{ secrets.HARBOR_SECRET }}
+      displayMajorVersion: ${{ needs.Checkout.outputs.majorVersion }}
+      displayMinorVersion: ${{ needs.Checkout.outputs.minorVersion }}
+      hugoVersion: ${{ needs.Checkout.outputs.hugoVersion }}
+    secrets: inherit
+
+  Publish:
+    needs: [Checkout,BuildAndPackage,Web]
+    uses: "./.github/workflows/_publish.yml"
+    with:
+      publishType: 'legacy'
+      currentVersion: ${{ needs.Checkout.outputs.currentVersion }}
+      apptainerVersion: ${{ needs.Checkout.outputs.apptainerVersion }}
+    secrets: inherit
