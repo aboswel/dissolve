@@ -135,7 +135,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         {
             parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                         site->parent()->name(), 
-                        site->uniqueSiteIndex().value_or(-1),
+                        std::get<1>(filteredASites[0]),
                         site->origin().x, site->origin().y, site->origin().z,
                         neighbours.size());
             
