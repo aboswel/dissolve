@@ -76,3 +76,11 @@ runs:
       git diff
       # Run quiet diff to fail the job if any changes were made (see man git-diff)
       git diff --quiet
+
+  - name: Cpp Check
+    shell: bash
+    run: |
+      set -ex
+      MAX_ERRORS=3
+      MAX_WARNINGS=1
+      nix develop -L --command scripts/cppCheckTest.sh $MAX_ERRORS $MAX_WARNINGS
