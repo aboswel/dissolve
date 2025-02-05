@@ -56,8 +56,9 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     Messenger::print("Successfully set target configuration to '{}'.\n", targetConfiguration_->name());
 
-    // TESTING CODE
-    std::vector<std::reference_wrapper<const std::unique_ptr<SpeciesSite>>> selectedSites;  // Changed to const
+    // TESTING CODE - FIND TWO SITES IN THE CONFIGURATION AND SET THOSE TO SELECTED SITES
+    // SelectedSites is a vector of vectors of const SpeciesSite pointers. This will be managed by GUI later, contructing BondInfo objects directly
+    std::vector<const SpeciesSite *> selectedSites;
     const auto& molecules = targetConfiguration_->molecules();
     
     // Keep track of species we've already processed
@@ -79,7 +80,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         const auto& speciesSites = species->sites();  // Added const
         for (const auto& site : speciesSites)         // Changed to const reference
         {
-            selectedSites.emplace_back(std::cref(site));  // Changed to cref
+            selectedSites.emplace_back(site.get()); 
         }
     }
 
@@ -90,28 +91,29 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         return ExecutionResult::Failed;
     }
 
-    BondInfo interBond = {selectedSites[0], selectedSites[1], 4.5};
+    // At this point, all weve done is generate a vector of const SpeciesSite pointers. Only need two for testing. These will be selected in the GUI later.
+    // Now we need to generate a bond between the two sites. 
+
+    //Generate a bond between the first two sites - again, just for testing purposes. 
+    BondInfo interBond(selectedSites[0], selectedSites[1], 4.5);
     std::vector<BondInfo> selectedBonds{interBond};
 
     // MODULE CODE
     auto& moduleData = moduleContext.dissolve().processingModuleData();
     LineParser parser;
-    std::string filename = fmt::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
+    std::string filename = std::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
     
     for (const auto& bonding : selectedBonds)
     {
-        std::vector<const SpeciesSite*> sitesA;
-        sitesA.push_back(bonding.site1_.get().get());
-
-        std::vector<const SpeciesSite*> sitesB;
-        sitesB.push_back(bonding.site2_.get().get());
-
-        SiteSelector selectionA(targetConfiguration_, sitesA);
+        // With revised BondInfo struct, we can more easily generate site instances from species sites (the role of SiteSelector)
+        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.target_});
         const Analyser::SiteVector& siteVectorA = selectionA.sites();
 
-        SiteSelector selectionB(targetConfiguration_, sitesB);
+        // Do the same for the neighbour sites
+        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.nbr_});
         const Analyser::SiteVector& siteVectorB = selectionB.sites();
 
+        // Site filter contains the target configuration, and the sites to filter by as SiteVectors
         SiteFilter filter(targetConfiguration_, siteVectorA);
         auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 100);
 
@@ -124,18 +126,18 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
         // Write header with site information
         parser.writeLineF("# Analysis for sites: {} - {}\n", 
-                         bonding.site1_.get().get()->parent()->name(),
-                         bonding.site2_.get().get()->parent()->name());
+                         bonding.target_->parent()->name(),
+                         bonding.nbr_->parent()->name());
         
         // Write the number of filtered sites
         parser.writeLineF("# Number of filtered sites: {}\n", filteredASites.size());
-
+        int i{0}; // Counter to get target site index
         // Write data for each filtered site and its neighbours
         for (const auto& [site, neighbours] : neighbourMap)
         {
             parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                         site->parent()->name(), 
-                        site->uniqueSiteIndex().value_or(-1),
+                        std::get<1>(filteredASites[i]),
                         site->origin().x, site->origin().y, site->origin().z,
                         neighbours.size());
             
@@ -147,6 +149,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                                 neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
                                 targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
             }
+            i++;
         }
     }
 

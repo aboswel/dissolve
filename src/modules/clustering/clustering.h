@@ -25,16 +25,18 @@ class ClusteringModule : public Module
     // Need to retrieve all the species in a configuration, then iterate through them to get the sites. Site combinations are then selected in the gui
     // Need a struct which contains all the user specified info for the intermolecular bonding
     
-    struct BondInfo {
-    std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site1_;
-    std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site2_;
+    // Struct 
+    struct BondInfo 
+    {
+    const SpeciesSite *target_, *nbr_;
     double cutOff;
     
-        BondInfo(std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site1,
-             std::reference_wrapper<const std::unique_ptr<SpeciesSite>> site2,
-             double cut)
-        : site1_(site1), site2_(site2), cutOff(cut) {}
+        BondInfo(const SpeciesSite* site1,
+                 const SpeciesSite* site2,
+                 double cut)
+        : target_(site1), nbr_(site2), cutOff(cut) {}
     };
+
     // Vector of intermolecular bonds specified
     std::vector<BondInfo> selectedBonds;
 
