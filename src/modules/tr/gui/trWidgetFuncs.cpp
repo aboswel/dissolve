@@ -16,7 +16,7 @@ TRModuleWidget::TRModuleWidget(QWidget *parent, TRModule *module, Dissolve &diss
     // Set up user interface
     ui_.setupUi(this);
 
-    // Set up RDF graph
+    // Set up TR graph
     trGraph_ = ui_.TRPlotWidget->dataViewer();
     // -- Set view
     trGraph_->view().setViewType(View::FlatXYView);
@@ -36,6 +36,8 @@ TRModuleWidget::TRModuleWidget(QWidget *parent, TRModule *module, Dissolve &diss
     trGraph_->groupManager().setGroupColouring("Unbound", RenderableGroup::AutomaticIndividualColouring);
     trGraph_->groupManager().setGroupVerticalShifting("Unbound", RenderableGroup::IndividualVerticalShifting);
     trGraph_->groupManager().setGroupStipple("Unbound", LineStipple::DotStipple);
+    trGraph_->groupManager().setGroupColouring("Total", RenderableGroup::AutomaticIndividualColouring);
+    trGraph_->groupManager().setGroupVerticalShifting("Total", RenderableGroup::IndividualVerticalShifting);
 
     refreshing_ = false;
 }
@@ -99,17 +101,35 @@ void TRModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlags> &upda
                                                          "Calculated");
             auto boundTotal = trGraph_->createRenderable<RenderableData1D>(
                 std::format("{}//WeightedTR//BoundTotal", module_->name()), "Bound T(R)", "Calculated");
-            boundTotal->setColour(StockColours::GreenStockColour);
             boundTotal->lineStyle().setStipple(LineStipple::DotStipple);
             auto unboundTotal = trGraph_->createRenderable<RenderableData1D>(
                 std::format("{}//WeightedTR//UnboundTotal", module_->name()), "Unbound T(R)", "Calculated");
-            unboundTotal->setColour(StockColours::GreenStockColour);
             unboundTotal->lineStyle().setStipple(LineStipple::HalfDashStipple);
+            auto refTR = trGraph_->createRenderable<RenderableData1D>(std::format("{}//ReferenceTR", module_->name()),
+                                                                      "Reference T(r)", "Reference");
+            refTR->setColour(StockColours::RedStockColour);
+            auto repTR = trGraph_->createRenderable<RenderableData1D>(
+                std::format("{}//RepresentativeTR//Total", module_->name()), "Via FT T(R)", "Calculated");
+            repTR->lineStyle().setStipple(LineStipple::HalfDashStipple);
+            repTR->setColour(StockColours::GreenStockColour);
+            auto repBoundTotal = trGraph_->createRenderable<RenderableData1D>(
+                std::format("{}//RepresentativeTR//BoundTotal", module_->name()), "Via FT Bound T(R)", "Calculated");
+            repBoundTotal->setColour(StockColours::GreenStockColour);
+            repBoundTotal->lineStyle().setStipple(LineStipple::DotStipple);
+            auto repUnboundTotal = trGraph_->createRenderable<RenderableData1D>(
+                std::format("{}//RepresentativeTR//UnboundTotal", module_->name()), "Via FT Unbound T(R)", "Calculated");
+            repUnboundTotal->setColour(StockColours::GreenStockColour);
+            repUnboundTotal->lineStyle().setStipple(LineStipple::HalfDashStipple);
         }
         else if (ui_.PartialsButton->isChecked())
         {
             targetPartials_ = dissolve_.processingModuleData().valueIf<PartialSet>("WeightedTR", module_->name());
             createPartialSetRenderables("WeightedTR");
+        }
+        else if (ui_.RepresentativePartialsButton->isChecked())
+        {
+            targetPartials_ = dissolve_.processingModuleData().valueIf<PartialSet>("RepresentativeTR", module_->name());
+            createPartialSetRenderables("RepresentativeTR");
         }
     }
 
@@ -142,8 +162,21 @@ void TRModuleWidget::on_TotalButton_clicked(bool checked)
     if (!checked)
         return;
 
+    ui_.ConfigurationTargetCombo->setEnabled(false);
+
     trGraph_->view().axes().setTitle(1, "T(r)");
     trGraph_->groupManager().setVerticalShiftAmount(RenderableGroupManager::OneVerticalShift);
+
+    updateControls(ModuleWidget::RecreateRenderablesFlag);
+}
+
+void TRModuleWidget::on_RepresentativePartialsButton_clicked(bool checked)
+{
+    if (!checked)
+        return;
+
+    trGraph_->view().axes().setTitle(1, "t(r)");
+    trGraph_->groupManager().setVerticalShiftAmount(RenderableGroupManager::TwoVerticalShift);
 
     updateControls(ModuleWidget::RecreateRenderablesFlag);
 }
