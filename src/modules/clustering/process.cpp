@@ -96,7 +96,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     //Generate a bond between the first two sites - again, just for testing purposes. 
     BondInfo interBond(selectedSites[0], selectedSites[1], 4.5);
-    std::vector<BondInfo> selectedBonds{interBond};
+    std::vector<BondInfo> selectedBonds{interBond}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
     auto& moduleData = moduleContext.dissolve().processingModuleData();
@@ -105,24 +105,32 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     
     for (const auto& bonding : selectedBonds)
     {
-        // With revised BondInfo struct, we can more easily generate site instances from species sites (the role of SiteSelector)
-        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.target_});
-        const Analyser::SiteVector& siteVectorA = selectionA.sites();
-
-        // Do the same for the neighbour sites
-        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.nbr_});
-        const Analyser::SiteVector& siteVectorB = selectionB.sites();
-
-        // Site filter contains the target configuration, and the sites to filter by as SiteVectors
-        SiteFilter filter(targetConfiguration_, siteVectorA);
-        auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 100);
-
         // Open output file
         if (!parser.openOutput(filename))
         {
             Messenger::error("Failed to open output file '{}'.\n", filename);
             return ExecutionResult::Failed;
         }
+
+        // With revised BondInfo struct, we can more easily generate site instances from species sites (the role of SiteSelector)
+        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.target_});
+        const Analyser::SiteVector& siteVectorA = selectionA.sites();
+        for (const auto& [site, index] : siteVectorA)
+        {
+            parser.writeLineF("Filter index (SiteAVector): {}\n", index);
+        }
+
+        // Do the same for the neighbour sites
+        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.nbr_});
+        const Analyser::SiteVector& siteVectorB = selectionB.sites();
+        for (const auto& [site, index] : siteVectorB)
+        {
+            parser.writeLineF("Filter index (SiteBVector): {}\n", index);
+        }
+
+        // Site filter contains the target configuration, and the sites to filter by as SiteVectors
+        SiteFilter filter(targetConfiguration_, siteVectorA);
+        auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 100);
 
         // Write header with site information
         parser.writeLineF("# Analysis for sites: {} - {}\n", 
@@ -131,8 +139,13 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         
         // Write the number of filtered sites
         parser.writeLineF("# Number of filtered sites: {}\n", filteredASites.size());
-        int i{0}; // Counter to get target site index
         // Write data for each filtered site and its neighbours
+        for (const auto& [site, index] : filteredASites)
+        {
+            parser.writeLineF("Filter index: {}, coords: {:.3f}\n", index, site->origin().x);
+        }
+
+        int i{0};
         for (const auto& [site, neighbours] : neighbourMap)
         {
             parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
@@ -145,7 +158,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
             {
                 parser.writeLineF("  Neighbour '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : distance = {}\n", 
                                 neighbour->parent()->name(), 
-                                index,
+                                neighbour->uniqueSiteIndex().value_or(-1),
                                 neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
                                 targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
             }
