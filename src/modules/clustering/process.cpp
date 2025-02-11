@@ -4,8 +4,6 @@
 // process.cpp
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
-#include "analyser/siteFilter.h"
-#include "analyser/siteSelector.h"
 #include "modules/clustering/clustering.h"
 
 // Main processing:
@@ -92,10 +90,10 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     }
 
     // At this point, all weve done is generate a vector of const SpeciesSite pointers. Only need two for testing. These will be selected in the GUI later.
-    // Now we need to generate a bond between the two sites. 
+    // Now we need to specify a bond between the two sites. 
 
     //Generate a bond between the first two sites - again, just for testing purposes. 
-    BondInfo interBond(selectedSites[0], selectedSites[1], 4.5);
+    BondInfo interBond(selectedSites[0], selectedSites[0], 4.5);
     std::vector<BondInfo> selectedBonds{interBond}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
@@ -103,6 +101,42 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     LineParser parser;
     std::string filename = std::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
     
+    // Generate symmetric adjacency list for the selected bond (index 0 for now)
+    auto [filteredSites, neighbourMap] = SiteFiltering(targetConfiguration_, selectedBonds[0]);
+
+    // Output file for diagnostics
+    if (!parser.openOutput(filename))
+    {
+        Messenger::error("Failed to open output file '{}'.\n", filename);
+        return ExecutionResult::Failed;
+    }
+
+    // Write header with site information
+    parser.writeLineF("# Analysis for sites: {} - {}\n", 
+                     selectedBonds[0].a_->parent()->name(),
+                     selectedBonds[0].b_->parent()->name());
+
+    int i{0};
+    for (const auto& [site, neighbours] : neighbourMap)
+    {
+        parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
+                    site->parent()->name(), 
+                    std::get<1>(filteredSites[i]),
+                    site->origin().x, site->origin().y, site->origin().z,
+                    neighbours.size());
+        
+        for (const auto& [neighbour, index] : neighbours)
+        {
+            parser.writeLineF("  Neighbour '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : distance = {}\n", 
+                            neighbour->parent()->name(), 
+                            index,
+                            neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
+                            targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
+        }
+        i++;
+    }
+
+    /*  Pre seperated function for filtering
     for (const auto& bonding : selectedBonds)
     {
         // Open output file
@@ -113,7 +147,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         }
 
         // With revised BondInfo struct, we can more easily generate site instances from species sites (the role of SiteSelector)
-        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.target_});
+        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.a_});
         const Analyser::SiteVector& siteVectorA = selectionA.sites();
         for (const auto& [site, index] : siteVectorA)
         {
@@ -121,7 +155,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         }
 
         // Do the same for the neighbour sites
-        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.nbr_});
+        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.b_});
         const Analyser::SiteVector& siteVectorB = selectionB.sites();
         for (const auto& [site, index] : siteVectorB)
         {
@@ -134,8 +168,8 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
         // Write header with site information
         parser.writeLineF("# Analysis for sites: {} - {}\n", 
-                         bonding.target_->parent()->name(),
-                         bonding.nbr_->parent()->name());
+                         bonding.a_->parent()->name(),
+                         bonding.b_->parent()->name());
         
         // Write the number of filtered sites
         parser.writeLineF("# Number of filtered sites: {}\n", filteredASites.size());
@@ -165,6 +199,46 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
             i++;
         }
     }
-
+    */
     return ExecutionResult::Success;
 }
+
+// Lets move the site proximity filtering to a separate function, will to deal with all bond vectors at once. How to handle strict H bonding??
+// This needs to generate a symmetric adjacency list for a given intermolecular bond - keep this in the format of filterBySiteProximity return?
+std::pair<Analyser::SiteVector, Analyser::SiteMap> ClusteringModule::SiteFiltering(Configuration *cfg_, BondInfo bond)
+{
+    // Transform SiteObjects to instances ready for the filter function
+    SiteSelector selectionA(cfg_, std::vector<const SpeciesSite*>{bond.a_});
+    const Analyser::SiteVector& siteVectorA = selectionA.sites();
+
+    SiteSelector selectionB(cfg_, std::vector<const SpeciesSite*>{bond.b_});
+    const Analyser::SiteVector& siteVectorB = selectionB.sites();
+
+    SiteFilter filterA(targetConfiguration_, siteVectorA);
+    auto [filteredASites, neighbourMapA] = filterA.filterBySiteProximity(siteVectorB, Range(0.01, bond.cutOff), 1, 100); // min of 0.01 to avoid self-bonding
+
+    // If we're dealing with a bond between the same site, it's already symmetric?? - test. Running twice will add dupes
+    if (bond.a_ == bond.b_)
+    {
+        return {filteredASites, neighbourMapA};
+    }
+
+    // Doing this twice allows us to generate a symmetric adjacency list
+    SiteFilter filterB(targetConfiguration_, siteVectorB);
+    auto [filteredBSites, neighbourMapB] = filterB.filterBySiteProximity(siteVectorA, Range(0.01, bond.cutOff), 1, 100);
+
+    // Combining the filtered sites into a single vector
+    Analyser::SiteVector combinedFilteredSites;
+    combinedFilteredSites.reserve(filteredASites.size() + filteredBSites.size());
+    combinedFilteredSites.insert(combinedFilteredSites.end(), filteredASites.begin(), filteredASites.end());
+    combinedFilteredSites.insert(combinedFilteredSites.end(), filteredBSites.begin(), filteredBSites.end()); 
+
+    // Combining the neighbour maps into a single map
+    Analyser::SiteMap combinedNeighbourMap;
+    combinedNeighbourMap.insert(neighbourMapA.begin(), neighbourMapA.end());
+    combinedNeighbourMap.insert(neighbourMapB.begin(), neighbourMapB.end());
+
+    return {combinedFilteredSites, combinedNeighbourMap};
+}
+
+

@@ -7,6 +7,8 @@
 
 #include "module/module.h"
 #include "module/context.h"
+#include "analyser/siteFilter.h"
+#include "analyser/siteSelector.h"
 
 // Clustering Module
 class ClusteringModule : public Module
@@ -28,13 +30,13 @@ class ClusteringModule : public Module
     // Struct 
     struct BondInfo 
     {
-    const SpeciesSite *target_, *nbr_;
+    const SpeciesSite *a_, *b_;
     double cutOff;
     
         BondInfo(const SpeciesSite* site1,
                  const SpeciesSite* site2,
                  double cut)
-        : target_(site1), nbr_(site2), cutOff(cut) {}
+        : a_(site1), b_(site2), cutOff(cut) {}
     };
 
     // Vector of intermolecular bonds specified
@@ -50,4 +52,5 @@ class ClusteringModule : public Module
     private:
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
+    std::pair<Analyser::SiteVector, Analyser::SiteMap> SiteFiltering(Configuration *cfg_, BondInfo bond);
 };
