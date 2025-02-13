@@ -52,5 +52,6 @@ class ClusteringModule : public Module
     private:
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
-    std::pair<Analyser::SiteVector, Analyser::SiteMap> SiteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds);
+    std::pair<Analyser::SiteVector, Analyser::SiteMap> siteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds);
+    std::map<int, std::vector<const Site*>> generateClusters(Analyser::SiteMap neighbourMap);
 };

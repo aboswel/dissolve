@@ -5,6 +5,7 @@
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
 #include "modules/clustering/clustering.h"
+#include <unordered_set>
 
 // Main processing:
 //
@@ -93,8 +94,8 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     // Now we need to specify a bond between the two sites. 
 
     //Generate bonds between the first two sites - again, just for testing purposes. 
-    BondInfo interBond(selectedSites[0], selectedSites[1], 4.5);
-    BondInfo interBond2(selectedSites[1], selectedSites[2], 4.5);
+    BondInfo interBond(selectedSites[0], selectedSites[1], 2);
+    BondInfo interBond2(selectedSites[1], selectedSites[2], 2);
     std::vector<BondInfo> selectedBonds{interBond, interBond2}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
@@ -103,7 +104,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     std::string filename = std::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
     
     // Generate symmetric adjacency list for the selected bond (index 0 for now)
-    auto [filteredSites, neighbourMap] = SiteFiltering(targetConfiguration_, selectedBonds);
+    auto [filteredSites, neighbourMap] = siteFiltering(targetConfiguration_, selectedBonds);
 
     // Output file for diagnostics
     if (!parser.openOutput(filename))
@@ -142,6 +143,21 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                             targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
         }
         i++;
+    }
+
+    auto clustersOut = generateClusters(neighbourMap);
+
+    // After clustersOut is generated, print diagnostics:
+    parser.writeLineF("\n=== Cluster Diagnostics ===\n");
+    for (const auto& [clusterId, clusterSites] : clustersOut)
+    {
+        parser.writeLineF("Cluster {}: {} site(s)\n", clusterId, clusterSites.size());
+        for (const auto& site : clusterSites)
+        {
+            parser.writeLineF("  Site '{}', coords: ({:.3f}, {:.3f}, {:.3f})\n", 
+                site->parent()->name(), site->origin().x, site->origin().y, site->origin().z);
+        }
+        parser.writeLineF("\n");
     }
 
     /*  Pre seperated function for filtering
@@ -213,7 +229,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
 // Lets move the site proximity filtering to a separate function, will to deal with all bond vectors at once. How to handle strict H bonding??
 // This needs to generate a symmetric adjacency list for a given intermolecular bond - keep this in the format of filterBySiteProximity return?
-std::pair<Analyser::SiteVector, Analyser::SiteMap> ClusteringModule::SiteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds)
+std::pair<Analyser::SiteVector, Analyser::SiteMap> ClusteringModule::siteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds)
 {
     Analyser::SiteVector combinedFilteredSites;
     Analyser::SiteMap combinedNeighbourMap;
@@ -265,4 +281,63 @@ std::pair<Analyser::SiteVector, Analyser::SiteMap> ClusteringModule::SiteFilteri
         }
     }
     return {combinedFilteredSites, combinedNeighbourMap};
+}
+
+// Organise combined neighbour map into clusters
+std::map<int, std::vector<const Site*>> ClusteringModule::generateClusters(Analyser::SiteMap neighbourMap)
+{
+    // We need to traverse the cluster:
+    //      We need a starting site (sites) - This is the first site in the cluster (iterate down neighbourmap for this)
+    //      From this site, we list all the neighbours
+    //      We purge neighbours that exist in the visited set
+    //      Those that are left, are put in the visited set and added to the cluster
+    //      Once added, these neighbours now become sites
+    //      All neighbours of these sites are now found, purged, added and become next sites
+    //      Continue until there are no more valid neighbours. Then we iterate down the siteMap until we find the next unvisited site, repeat process.
+
+    std::unordered_set<const Site*> visited;
+    std::map<int, std::vector<const Site*>> clusters;
+    std::vector<const Site*> sites;
+    int clusterTrack{1};
+
+    for (const auto& [clusterStart, _] : neighbourMap)
+    {
+        // check if the selected site has been visited.
+        if (visited.contains(clusterStart))
+        {
+            continue;
+        }
+
+        // cluster start becomes sites
+        sites.emplace_back(clusterStart);
+
+        // While loop continues for this cluster until sites ends up empty, effectively until there are no more unvisited neighbours
+        while (!sites.empty())
+        {
+            // Add sites to visited and cluster
+            for (const auto& s : sites)
+            {
+                visited.insert(s);
+            }
+            clusters[clusterTrack].insert(clusters[clusterTrack].end(), sites.begin(), sites.end());
+
+            // Use an unordered_set to collect new neighbours (avoids duplicates)
+            std::unordered_set<const Site*> newNeighbours;
+            for (const auto& si : sites)
+            {
+                for (const auto& nbr : neighbourMap[si])
+                {
+                    if (visited.contains(std::get<0>(nbr)))
+                    {
+                        continue;
+                    }
+                    newNeighbours.insert(std::get<0>(nbr));
+                }
+            }
+            // Convert the set of newNeighbours to a vector and use as next sites
+            sites.assign(newNeighbours.begin(), newNeighbours.end());
+        }
+        clusterTrack++;
+    }
+    return clusters;
 }
