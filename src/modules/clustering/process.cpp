@@ -128,7 +128,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     int i{0};
     for (const auto& [site, neighbours] : neighbourMap)
     {
-        parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
+        parser.writeLineF("\nSite '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                     site->parent()->name(), 
                     std::get<1>(filteredSites[i]),
                     site->origin().x, site->origin().y, site->origin().z,
@@ -160,6 +160,8 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         parser.writeLineF("\n");
     }
 
+   
+
     // Write clusters and other diagnostics...
     // Now compute the cluster size distribution and output it
     auto distribution = sizeDistribution(clustersOut);
@@ -167,6 +169,14 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     for (const auto& [clusterSize, count] : distribution)
     {
         parser.writeLineF("  Cluster Size {} : {} clusters\n", clusterSize, count);
+    }
+
+    // Compute mass distribution diagnostic
+    auto massDist = massDistribution(clustersOut);
+    parser.writeLineF("\nCluster Mass Distribution:\n");
+    for (const auto& [clusterMass, count] : massDist)
+    {
+        parser.writeLineF("  Cluster Mass {:.3f} : {} clusters\n", clusterMass, count);
     }
 
     return ExecutionResult::Success;
@@ -294,9 +304,27 @@ std::map<int, int> ClusteringModule::sizeDistribution(std::map<int, std::vector<
     std::map<int, int> distribution; // {cluster size : no of clusters}
 
     // Iterate through the cluster map
-    for (auto [clusterID, members] : clusterMap)
+    for (const auto& [_, members] : clusterMap)
     {
         distribution[members.size()]++;
+    }
+    return distribution;
+}
+// Cluster mass distribution
+std::map<float, int> ClusteringModule::massDistribution(std::map<int, std::vector<const Site*>> clusterMap)
+{
+    std::map<float, int> distribution; // {cluster mass : no of clusters}
+
+    // Iterate through cluster map
+    for (const auto& [_, memberVec] : clusterMap)
+    {
+        float clusterMass{0};
+        for (const auto& member : memberVec)
+        {
+            // Might be prudent to check the site actually has a parent species with a mass here else going to have issues
+            clusterMass += member->parent()->parent()->mass();
+        }
+        distribution[clusterMass]++;
     }
     return distribution;
 }

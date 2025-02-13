@@ -60,4 +60,6 @@ class ClusteringModule : public Module
     // Basic metric computation
     // Calculates cluster size (No. of members) distribution from cluster map
     std::map<int, int> sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap);
+    // Calculates cluster mass distribution from cluster map
+    std::map<float, int> massDistribution(std::map<int, std::vector<const Site*>> clusterMap);
 };
