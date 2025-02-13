@@ -160,70 +160,15 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         parser.writeLineF("\n");
     }
 
-    /*  Pre seperated function for filtering
-    for (const auto& bonding : selectedBonds)
+    // Write clusters and other diagnostics...
+    // Now compute the cluster size distribution and output it
+    auto distribution = sizeDistribution(clustersOut);
+    parser.writeLineF("\nCluster Size Distribution:\n");
+    for (const auto& [clusterSize, count] : distribution)
     {
-        // Open output file
-        if (!parser.openOutput(filename))
-        {
-            Messenger::error("Failed to open output file '{}'.\n", filename);
-            return ExecutionResult::Failed;
-        }
-
-        // With revised BondInfo struct, we can more easily generate site instances from species sites (the role of SiteSelector)
-        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.a_});
-        const Analyser::SiteVector& siteVectorA = selectionA.sites();
-        for (const auto& [site, index] : siteVectorA)
-        {
-            parser.writeLineF("Filter index (SiteAVector): {}\n", index);
-        }
-
-        // Do the same for the neighbour sites
-        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite*>{bonding.b_});
-        const Analyser::SiteVector& siteVectorB = selectionB.sites();
-        for (const auto& [site, index] : siteVectorB)
-        {
-            parser.writeLineF("Filter index (SiteBVector): {}\n", index);
-        }
-
-        // Site filter contains the target configuration, and the sites to filter by as SiteVectors
-        SiteFilter filter(targetConfiguration_, siteVectorA);
-        auto [filteredASites, neighbourMap] = filter.filterBySiteProximity(siteVectorB, Range(0, bonding.cutOff), 1, 100);
-
-        // Write header with site information
-        parser.writeLineF("# Analysis for sites: {} - {}\n", 
-                         bonding.a_->parent()->name(),
-                         bonding.b_->parent()->name());
-        
-        // Write the number of filtered sites
-        parser.writeLineF("# Number of filtered sites: {}\n", filteredASites.size());
-        // Write data for each filtered site and its neighbours
-        for (const auto& [site, index] : filteredASites)
-        {
-            parser.writeLineF("Filter index: {}, coords: {:.3f}\n", index, site->origin().x);
-        }
-
-        int i{0};
-        for (const auto& [site, neighbours] : neighbourMap)
-        {
-            parser.writeLineF("Site '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
-                        site->parent()->name(), 
-                        std::get<1>(filteredASites[i]),
-                        site->origin().x, site->origin().y, site->origin().z,
-                        neighbours.size());
-            
-            for (const auto& [neighbour, index] : neighbours)
-            {
-                parser.writeLineF("  Neighbour '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : distance = {}\n", 
-                                neighbour->parent()->name(), 
-                                neighbour->uniqueSiteIndex().value_or(-1),
-                                neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
-                                targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
-            }
-            i++;
-        }
+        parser.writeLineF("  Cluster Size {} : {} clusters\n", clusterSize, count);
     }
-    */
+
     return ExecutionResult::Success;
 }
 
@@ -340,4 +285,18 @@ std::map<int, std::vector<const Site*>> ClusteringModule::generateClusters(Analy
         clusterTrack++;
     }
     return clusters;
+}
+
+// Basic metric computation
+// Cluster size distribution
+std::map<int, int> ClusteringModule::sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap)
+{
+    std::map<int, int> distribution; // {cluster size : no of clusters}
+
+    // Iterate through the cluster map
+    for (auto [clusterID, members] : clusterMap)
+    {
+        distribution[members.size()]++;
+    }
+    return distribution;
 }

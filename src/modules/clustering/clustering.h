@@ -52,6 +52,12 @@ class ClusteringModule : public Module
     private:
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
+    // Basic analysis routine
+    // Generates a symmetric adjacency list from specified intermolecular bonds
     std::pair<Analyser::SiteVector, Analyser::SiteMap> siteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds);
+    // Generates a cluster map from adjacency list
     std::map<int, std::vector<const Site*>> generateClusters(Analyser::SiteMap neighbourMap);
+    // Basic metric computation
+    // Calculates cluster size (No. of members) distribution from cluster map
+    std::map<int, int> sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap);
 };
