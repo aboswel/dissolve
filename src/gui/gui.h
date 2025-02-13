@@ -254,4 +254,11 @@ class DissolveWindow : public QMainWindow
     Q_SIGNALS:
     void iterate(int);
     void stopIterating();
+
+    /*
+     * Checks
+     */
+    public:
+    // Checks pair potential range against all present box geometries
+    void checkPairPotentialRange(QWidget *parent = nullptr);
 };
