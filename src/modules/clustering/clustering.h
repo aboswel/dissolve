@@ -41,6 +41,8 @@ class ClusteringModule : public Module
 
     // Vector of intermolecular bonds specified
     std::vector<BondInfo> selectedBonds;
+    std::pair<Analyser::SiteVector, Analyser::SiteMap> neighbourMap_;
+    std::map<int, std::vector<const Site*>> clusterMap_;
 
     /*
      * Processing
@@ -52,14 +54,19 @@ class ClusteringModule : public Module
     private:
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
-    // Basic analysis routine
+
+    // Basic analysis routine - these are always run with analysis
     // Generates a symmetric adjacency list from specified intermolecular bonds
-    std::pair<Analyser::SiteVector, Analyser::SiteMap> siteFiltering(Configuration *cfg_, std::vector<BondInfo> bonds);
+    std::pair<Analyser::SiteVector, Analyser::SiteMap> makeNeighbourMap(Configuration *cfg_, std::vector<BondInfo> bonds);
     // Generates a cluster map from adjacency list
-    std::map<int, std::vector<const Site*>> generateClusters(Analyser::SiteMap neighbourMap);
-    // Basic metric computation
+    std::map<int, std::vector<const Site*>> makeClusterMap(Analyser::SiteMap neighbourMap);
+
+    // Basic metric computation - these are default on?
     // Calculates cluster size (No. of members) distribution from cluster map
     std::map<int, int> sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap);
     // Calculates cluster mass distribution from cluster map
     std::map<float, int> massDistribution(std::map<int, std::vector<const Site*>> clusterMap);
+    // Calculates clustering coordination numbers symmetrically for each intermolecular bond. Min and Max cluster sizes to include in calc. can be specified.
+    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>  clusterSpeciesCoordNo(Analyser::SiteMap neighbourMap,
+                                                                        std::map<int, std::vector<const Site*>> clusterMap, int minSize = 0, int maxSize = 0);
 };
