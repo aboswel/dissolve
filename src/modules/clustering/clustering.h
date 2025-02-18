@@ -9,6 +9,7 @@
 #include "module/context.h"
 #include "analyser/siteFilter.h"
 #include "analyser/siteSelector.h"
+#include <unordered_set>
 
 // Clustering Module
 class ClusteringModule : public Module
@@ -22,7 +23,7 @@ class ClusteringModule : public Module
      */
     private:
     // Target configurations
-    Configuration *targetConfiguration_{nullptr};
+    Configuration *targetConfiguration_{nullptr}; // Will set in GUI
     // Simulation data...
     // Need to retrieve all the species in a configuration, then iterate through them to get the sites. Site combinations are then selected in the gui
     // Need a struct which contains all the user specified info for the intermolecular bonding
@@ -40,9 +41,26 @@ class ClusteringModule : public Module
     };
 
     // Vector of intermolecular bonds specified
-    std::vector<BondInfo> selectedBonds;
-    std::pair<Analyser::SiteVector, Analyser::SiteMap> neighbourMap_;
+    std::vector<BondInfo> selectedBonds_;
+    Analyser::SiteMap neighbourMap_;
     std::map<int, std::vector<const Site*>> clusterMap_;
+    std::map<int, int> sizeDistribution_;
+    std::map<float, int> massDistribution_;
+    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> clusterSpeciesCoordNo_;
+    int minCNSize_{0};
+    int maxCNSize_{0};
+    std::map<int, float> radiusOfGyration_;
+    int gyrationMinSize_{3};
+
+    // Getters
+    public:
+    std::vector<BondInfo>& getSelectedBonds();
+    Analyser::SiteMap& getNeighbourMap();
+    std::map<int, std::vector<const Site*>>& getClusterMap();
+    std::map<int, int>& getSizeDistribution();
+    std::map<float, int>& getMassDistribution();
+    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>& getClusterSpeciesCoordNo();
+    // std::map<int, float>& getRadiusOfGyration();
 
     /*
      * Processing
@@ -55,18 +73,18 @@ class ClusteringModule : public Module
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
 
-    // Basic analysis routine - these are always run with analysis
     // Generates a symmetric adjacency list from specified intermolecular bonds
-    std::pair<Analyser::SiteVector, Analyser::SiteMap> makeNeighbourMap(Configuration *cfg_, std::vector<BondInfo> bonds);
+    void generateNeighbourMap();
     // Generates a cluster map from adjacency list
-    std::map<int, std::vector<const Site*>> makeClusterMap(Analyser::SiteMap neighbourMap);
+    void generateClusterMap();
 
-    // Basic metric computation - these are default on?
     // Calculates cluster size (No. of members) distribution from cluster map
-    std::map<int, int> sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap);
+    void generateSizeDistribution();
     // Calculates cluster mass distribution from cluster map
-    std::map<float, int> massDistribution(std::map<int, std::vector<const Site*>> clusterMap);
+    void generateMassDistribution();
     // Calculates clustering coordination numbers symmetrically for each intermolecular bond. Min and Max cluster sizes to include in calc. can be specified.
-    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>  clusterSpeciesCoordNo(Analyser::SiteMap neighbourMap,
-                                                                        std::map<int, std::vector<const Site*>> clusterMap, int minSize = 0, int maxSize = 0);
+    void  generateClusterSpeciesCoordNo();
+    
+    // Radius of Gyration: computes "compactness" of each cluster (used in fractal dimension as well)
+    // void generateRadiusOfGyration();
 };

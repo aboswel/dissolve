@@ -2,10 +2,10 @@
 // Copyright (c) 2024 Team Dissolve and contributors
 
 // process.cpp
+#include "modules/clustering/clustering.h"
+#include "analyser/typeDefs.h"
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
-#include "modules/clustering/clustering.h"
-#include <unordered_set>
 
 // Main processing:
 //
@@ -96,16 +96,13 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     //Generate bonds between the first two sites - again, just for testing purposes. 
     BondInfo interBond(selectedSites[0], selectedSites[1], 6);
     BondInfo interBond2(selectedSites[1], selectedSites[2], 2);
-    std::vector<BondInfo> selectedBonds{interBond, interBond2}; // Will for loop this later to add each selected bond, just need one for now
+    selectedBonds_ = {interBond, interBond2}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
     auto& moduleData = moduleContext.dissolve().processingModuleData();
     LineParser parser;
     std::string filename = std::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
     
-    // Generate symmetric adjacency list for the selected bond (index 0 for now)
-    auto [filteredSites, neighbourMap_] = makeNeighbourMap(targetConfiguration_, selectedBonds);
-
     // Output file for diagnostics
     if (!parser.openOutput(filename))
     {
@@ -115,22 +112,16 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     // Write header with site information
     parser.writeLineF("# Analysis for sites: {} - {}, {} - {}\n", 
-                     selectedBonds[0].a_->parent()->name(),
-                     selectedBonds[0].b_->parent()->name(),
-                     selectedBonds[1].a_->parent()->name(),
-                     selectedBonds[1].b_->parent()->name());
+                     selectedBonds_[0].a_->parent()->name(),
+                     selectedBonds_[0].b_->parent()->name(),
+                     selectedBonds_[1].a_->parent()->name(),
+                     selectedBonds_[1].b_->parent()->name());
 
-    for (const auto& [site, index] : filteredSites)
+    
+    for (const auto& [site, neighbours] : getNeighbourMap())
     {
-        parser.writeLineF("Filter name: {}, index: {}, coords: {:.3f}\n", site->parent()->name(), index, site->origin().x);
-    }
-
-    int i{0};
-    for (const auto& [site, neighbours] : neighbourMap_)
-    {
-        parser.writeLineF("\nSite '{}', uniqueSiteIndex '{}' at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
+        parser.writeLineF("\nSite '{}', at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                     site->parent()->name(), 
-                    std::get<1>(filteredSites[i]),
                     site->origin().x, site->origin().y, site->origin().z,
                     neighbours.size());
         
@@ -142,14 +133,11 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                             neighbour->origin().x, neighbour->origin().y, neighbour->origin().z,
                             targetConfiguration_->box()->minimumDistance(site->origin(), neighbour->origin()));
         }
-        i++;
     }
-
-    clusterMap_ = makeClusterMap(neighbourMap_);
 
     // After clustersOut is generated, print diagnostics:
     parser.writeLineF("\n=== Cluster Diagnostics ===\n");
-    for (const auto& [clusterId, clusterSites] : clusterMap_)
+    for (const auto& [clusterId, clusterSites] : getClusterMap())
     {
         parser.writeLineF("Cluster {}: {} site(s)\n", clusterId, clusterSites.size());
         for (const auto& site : clusterSites)
@@ -160,31 +148,25 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         parser.writeLineF("\n");
     }
 
-   
-
     // Write clusters and other diagnostics...
     // Now compute the cluster size distribution and output it
-    auto sizeDist = sizeDistribution(clusterMap_);
-    parser.writeLineF("\nCluster Size Distribution:\n");
-    for (const auto& [clusterSize, count] : sizeDist)
+    parser.writeLineF("\n=== Cluster Size Distribution ===\n");
+    for (const auto& [clusterSize, count] : getSizeDistribution())
     {
         parser.writeLineF("  Cluster Size {} : {} clusters\n", clusterSize, count);
     }
 
     // Compute mass distribution diagnostic
-    auto massDist = massDistribution(clusterMap_);
-    parser.writeLineF("\nCluster Mass Distribution:\n");
+    auto massDist = getMassDistribution();
+    parser.writeLineF("\n=== Cluster Mass Distribution ===\n");
     for (const auto& [clusterMass, count] : massDist)
     {
         parser.writeLineF("  Cluster Mass {:.3f} : {} clusters\n", clusterMass, count);
     }
 
-    // Compute coordination numbers for clusters (using full range by default)
-    auto coordNumbers = clusterSpeciesCoordNo(neighbourMap_, clusterMap_);
-
     // Write coordination number diagnostics to output file
     parser.writeLineF("\n=== Coordination Numbers ===\n");
-    for (const auto& [siteA, innerMap] : coordNumbers)
+    for (const auto& [siteA, innerMap] : getClusterSpeciesCoordNo())
     {
         for (const auto& [siteB, coord] : innerMap)
         {
@@ -194,195 +176,6 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                                 coord);
         }
     }
-
     return ExecutionResult::Success;
 }
 
-// Lets move the site proximity filtering to a separate function, will to deal with all bond vectors at once. How to handle strict H bonding??
-// This needs to generate a symmetric adjacency list for a given intermolecular bond - keep this in the format of filterBySiteProximity return?
-std::pair<Analyser::SiteVector, Analyser::SiteMap> ClusteringModule::makeNeighbourMap(Configuration *cfg_, std::vector<BondInfo> bonds)
-{
-    Analyser::SiteVector combinedFilteredSites;
-    Analyser::SiteMap combinedNeighbourMap;
-
-    for (auto bond : bonds)
-    {
-        // Transform SiteObjects to instances ready for the filter function
-        SiteSelector selectionA(cfg_, std::vector<const SpeciesSite*>{bond.a_});
-        const Analyser::SiteVector& siteVectorA = selectionA.sites();
-
-        SiteSelector selectionB(cfg_, std::vector<const SpeciesSite*>{bond.b_});
-        const Analyser::SiteVector& siteVectorB = selectionB.sites();
-
-        SiteFilter filterA(targetConfiguration_, siteVectorA);
-        auto [filteredASites, neighbourMapA] = filterA.filterBySiteProximity(siteVectorB, Range(0.01, bond.cutOff), 1, 100); // min of 0.01 to avoid self-bonding
-
-        // If we're dealing with a bond between the same site, it's already symmetric. Running twice will add dupes
-        if (bond.a_ == bond.b_)
-        {
-            combinedFilteredSites.reserve(combinedFilteredSites.size() + filteredASites.size());
-            combinedFilteredSites.insert(combinedFilteredSites.end(), filteredASites.begin(), filteredASites.end());
-            combinedNeighbourMap.insert(neighbourMapA.begin(), neighbourMapA.end());
-            continue;
-        }
-
-        // Doing this twice allows us to generate a symmetric adjacency list
-        SiteFilter filterB(targetConfiguration_, siteVectorB);
-        auto [filteredBSites, neighbourMapB] = filterB.filterBySiteProximity(siteVectorA, Range(0.01, bond.cutOff), 1, 100);
-
-        // Combining the filtered sites into a single vector
-        combinedFilteredSites.reserve(combinedFilteredSites.size() + filteredASites.size() + filteredBSites.size());
-        combinedFilteredSites.insert(combinedFilteredSites.end(), filteredASites.begin(), filteredASites.end());
-        combinedFilteredSites.insert(combinedFilteredSites.end(), filteredBSites.begin(), filteredBSites.end()); 
-
-        // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add neighbours if exists.
-        for (auto neighbourMap : {neighbourMapA, neighbourMapB})
-        {
-            for (const auto& [site, neighbours] : neighbourMap)
-            {
-                if (combinedNeighbourMap.contains(site))
-                {
-                    combinedNeighbourMap[site].insert(combinedNeighbourMap[site].end(), neighbours.begin(), neighbours.end());
-                }
-                else
-                {
-                    combinedNeighbourMap.insert({site, neighbours});
-                }
-            }
-        }
-    }
-    return {combinedFilteredSites, combinedNeighbourMap};
-}
-
-// Organise combined neighbour map into clusters
-// {Cluster No (for ID) : (sites* contributing to cluster)}
-std::map<int, std::vector<const Site*>> ClusteringModule::makeClusterMap(Analyser::SiteMap neighbourMap)
-{
-    // We need to traverse the cluster:
-    //      We need a starting site (sites) - This is the first site in the cluster (iterate down neighbourmap for this)
-    //      From this site, we list all the neighbours
-    //      We purge neighbours that exist in the visited set
-    //      Those that are left, are put in the visited set and added to the cluster
-    //      Once added, these neighbours now become sites
-    //      All neighbours of these sites are now found, purged, added and become next sites
-    //      Continue until there are no more valid neighbours. Then we iterate down the siteMap until we find the next unvisited site, repeat process.
-    //      Ought to see if theres a better way to do this...
-
-    std::unordered_set<const Site*> visited;
-    std::map<int, std::vector<const Site*>> clusters;
-    std::vector<const Site*> sites;
-    int clusterTrack{1};
-
-    for (const auto& [clusterStart, _] : neighbourMap)
-    {
-        // check if the selected site has been visited.
-        if (visited.contains(clusterStart))
-        {
-            continue;
-        }
-
-        // cluster start becomes sites
-        sites.emplace_back(clusterStart);
-
-        // While loop continues for this cluster until sites ends up empty, effectively until there are no more unvisited neighbours
-        while (!sites.empty())
-        {
-            // Add sites to visited and cluster
-            for (const auto& s : sites)
-            {
-                visited.insert(s);
-            }
-            clusters[clusterTrack].insert(clusters[clusterTrack].end(), sites.begin(), sites.end());
-
-            // Use an unordered_set to collect new neighbours (avoids duplicates)
-            std::unordered_set<const Site*> newNeighbours;
-            for (const auto& si : sites)
-            {
-                for (const auto& nbr : neighbourMap[si])
-                {
-                    if (visited.contains(std::get<0>(nbr)))
-                    {
-                        continue;
-                    }
-                    newNeighbours.insert(std::get<0>(nbr));
-                }
-            }
-            // Convert the set of newNeighbours to a vector and use as next sites
-            sites.assign(newNeighbours.begin(), newNeighbours.end());
-        }
-        clusterTrack++;
-    }
-    return clusters;
-}
-
-// Basic metric computation
-// Cluster size distribution
-std::map<int, int> ClusteringModule::sizeDistribution(std::map<int, std::vector<const Site*>> clusterMap)
-{
-    std::map<int, int> distribution; // {cluster size : no of clusters}
-
-    // Iterate through the cluster map
-    for (const auto& [_, members] : clusterMap)
-    {
-        distribution[members.size()]++;
-    }
-    return distribution;
-}
-// Cluster mass distribution
-std::map<float, int> ClusteringModule::massDistribution(std::map<int, std::vector<const Site*>> clusterMap)
-{
-    std::map<float, int> distribution; // {cluster mass : no of clusters}
-
-    // Iterate through cluster map
-    for (const auto& [_, memberVec] : clusterMap)
-    {
-        float clusterMass{0};
-        for (const auto& member : memberVec)
-        {
-            clusterMass += member->parent()->parent()->mass();
-        }
-        distribution[clusterMass]++;
-    }
-    return distribution;
-}
-// Coordination numbers for each intermolecular bond (symmetric) in cluster sizes ranging from min to max
-// Min and max values optional. 0 values indicate no restriction
-// {(subject site, object site) : coord no.}
-// I'm not sure how useful this actually is...
-std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> 
-ClusteringModule::clusterSpeciesCoordNo(Analyser::SiteMap neighbourMap, std::map<int, std::vector<const Site*>> clusterMap, int minSize, int maxSize)
-{
-    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> bonds;
-    std::map<const SpeciesSite*, int> instances;
-    bool fullRange = (minSize == 0 && maxSize == 0);
-
-    // Start iterating through the cluster map.
-    for (auto const& [_, clusterVec] : clusterMap)
-    {
-        // Check if size restrictions apply
-        if (fullRange || clusterVec.size() >= minSize && clusterVec.size() <= maxSize)
-        {
-            // Iterate through each member of the cluster
-            for (auto const& clusterMem : clusterVec)
-            {
-                // For each species found, increment the total number of that species by one.
-                instances[clusterMem->parent()]++;
-
-                // Find the member in the neighbour map, 
-                for (auto const& [clusterMemNbr, index] : neighbourMap[clusterMem])
-                {
-                    bonds[clusterMem->parent()][clusterMemNbr->parent()]++;
-                }
-            }
-        }
-    }
-    // Average the coordination numbers
-    for (const auto& [siteA, num] : instances)
-    {
-        for (const auto& [siteB, coordNo] : bonds[siteA])
-        {
-            bonds[siteA][siteB] /= num;
-        }
-    }
-    return bonds;
-}
