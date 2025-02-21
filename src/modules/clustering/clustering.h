@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 // Define the main clustering class to store user defined parameters and analysis settings, as well as function prototypes and helper methods
 // clustering.h
@@ -45,7 +45,7 @@ class ClusteringModule : public Module
     Analyser::SiteMap neighbourMap_;
     std::map<int, std::vector<const Site*>> clusterMap_;
     std::map<int, int> sizeDistribution_;
-    std::map<float, int> massDistribution_;
+    std::map<float, std::vector<int>> massDistribution_;
     std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> clusterSpeciesCoordNo_;
     int minCNSize_{0};
     int maxCNSize_{0};
@@ -58,9 +58,9 @@ class ClusteringModule : public Module
     Analyser::SiteMap& getNeighbourMap();
     std::map<int, std::vector<const Site*>>& getClusterMap();
     std::map<int, int>& getSizeDistribution();
-    std::map<float, int>& getMassDistribution();
+    std::map<float, std::vector<int>>& getMassDistribution(); // Use .size() to get the number of clusters of a mass.
     std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>& getClusterSpeciesCoordNo();
-    // std::map<int, float>& getRadiusOfGyration();
+    std::map<int, float>& getRadiusOfGyration();
 
     /*
      * Processing
@@ -86,5 +86,5 @@ class ClusteringModule : public Module
     void  generateClusterSpeciesCoordNo();
     
     // Radius of Gyration: computes "compactness" of each cluster (used in fractal dimension as well)
-    // void generateRadiusOfGyration();
+    void generateRadiusOfGyration();
 };

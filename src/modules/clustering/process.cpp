@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 // process.cpp
 #include "modules/clustering/clustering.h"
@@ -94,9 +94,10 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     // Now we need to specify a bond between the two sites. 
 
     //Generate bonds between the first two sites - again, just for testing purposes. 
-    BondInfo interBond(selectedSites[0], selectedSites[1], 6);
-    BondInfo interBond2(selectedSites[1], selectedSites[2], 2);
-    selectedBonds_ = {interBond, interBond2}; // Will for loop this later to add each selected bond, just need one for now
+    BondInfo interBond(selectedSites[0], selectedSites[0], 2.5);
+    BondInfo interBond2(selectedSites[0], selectedSites[2], 2);
+    BondInfo interBond3(selectedSites[2], selectedSites[2], 2);
+    selectedBonds_ = {interBond, interBond2, interBond3}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
     auto& moduleData = moduleContext.dissolve().processingModuleData();
@@ -111,7 +112,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     }
 
     // Write header with site information
-    parser.writeLineF("# Analysis for sites: {} - {}, {} - {}\n", 
+    parser.writeLineF("# Analysis for sites: {} - {}\n", 
                      selectedBonds_[0].a_->parent()->name(),
                      selectedBonds_[0].b_->parent()->name(),
                      selectedBonds_[1].a_->parent()->name(),
@@ -157,11 +158,14 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     }
 
     // Compute mass distribution diagnostic
-    auto massDist = getMassDistribution();
     parser.writeLineF("\n=== Cluster Mass Distribution ===\n");
-    for (const auto& [clusterMass, count] : massDist)
+    for (const auto& [clusterMass, clusterVec] : getMassDistribution())
     {
-        parser.writeLineF("  Cluster Mass {:.3f} : {} clusters\n", clusterMass, count);
+        for (const auto& cluster : clusterVec)
+        {
+                parser.writeLineF("  Cluster Mass {:.3f} : cluster ID: {}\n", clusterMass, cluster);
+        }
+
     }
 
     // Write coordination number diagnostics to output file

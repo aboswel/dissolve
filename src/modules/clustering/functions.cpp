@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2024 Team Dissolve and contributors
+// Copyright (c) 2025 Team Dissolve and contributors
 
 #include "modules/clustering/clustering.h"
 #include "analyser/typeDefs.h"
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
 #include <unordered_set>
+#include <tuple>
 
 // Getter functions
 Analyser::SiteMap& ClusteringModule::getNeighbourMap()
@@ -35,7 +36,7 @@ std::map<int, int>& ClusteringModule::getSizeDistribution()
     return sizeDistribution_;
 }
 
-std::map<float, int>& ClusteringModule::getMassDistribution()
+std::map<float, std::vector<int>>& ClusteringModule::getMassDistribution()
 {
     if (massDistribution_.empty())
     {
@@ -53,7 +54,7 @@ std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>&  ClusteringMo
     return clusterSpeciesCoordNo_;
 }
 
-/*
+
 std::map<int, float>& ClusteringModule::getRadiusOfGyration()
 {
     if (radiusOfGyration_.empty())
@@ -62,17 +63,18 @@ std::map<int, float>& ClusteringModule::getRadiusOfGyration()
     }
     return radiusOfGyration_;
 }
-*/
+
 // Process functions
 // Lets move the site proximity filtering to a separate function, will to deal with all bond vectors at once. How to handle strict H bonding??
 // This needs to generate a symmetric adjacency list for a given intermolecular bond - keep this in the format of filterBySiteProximity return?
 void ClusteringModule::generateNeighbourMap()
 {
-    Analyser::SiteVector combinedFilteredSites;
     Analyser::SiteMap combinedNeighbourMap;
 
     for (auto bond : selectedBonds_) // Change to getter function when this is actually selected in GUI
     {
+        Analyser::SiteMap neighbourMapA, neighbourMapB;
+
         // Transform SiteObjects to instances ready for the filter function
         SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite*>{bond.a_});
         const Analyser::SiteVector& siteVectorA = selectionA.sites();
@@ -81,18 +83,14 @@ void ClusteringModule::generateNeighbourMap()
         const Analyser::SiteVector& siteVectorB = selectionB.sites();
 
         SiteFilter filterA(targetConfiguration_, siteVectorA);
-        auto [_, neighbourMapA] = filterA.filterBySiteProximity(siteVectorB, Range(0.01, bond.cutOff), 1, 100); // min of 0.01 to avoid self-bonding
+        std::tie(std::ignore, neighbourMapA) = filterA.filterBySiteProximity(siteVectorB, Range(0.001, bond.cutOff), 1, 100); // min of 0.01 to avoid self-bonding
 
         // If we're dealing with a bond between the same site, it's already symmetric. Running twice will add dupes
-        if (bond.a_ == bond.b_)
+        if (bond.a_ != bond.b_)
         {
-            combinedNeighbourMap.insert(neighbourMapA.begin(), neighbourMapA.end());
-            continue;
+            SiteFilter filterB(targetConfiguration_, siteVectorB);
+            std::tie(std::ignore, neighbourMapB) = filterB.filterBySiteProximity(siteVectorA, Range(0.001, bond.cutOff), 1, 100);
         }
-
-        // Doing this twice allows us to generate a symmetric adjacency list
-        SiteFilter filterB(targetConfiguration_, siteVectorB);
-        auto [_1, neighbourMapB] = filterB.filterBySiteProximity(siteVectorA, Range(0.01, bond.cutOff), 1, 100);
 
         // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add neighbours if exists.
         for (auto neighbourMap : {neighbourMapA, neighbourMapB})
@@ -128,7 +126,7 @@ void ClusteringModule::generateClusterMap()
     //      Ought to see if theres a better way to do this...
 
     std::unordered_set<const Site*> visited;
-    std::map<int, std::vector<const Site*>> clusters;
+    std::map<int, std::vector<const Site*>> clusters; // {ClusterID : vector of sites belonging to cluster}
     std::vector<const Site*> sites;
     int clusterTrack{1};
 
@@ -190,17 +188,17 @@ void ClusteringModule::generateSizeDistribution()
 // Cluster mass distribution
 void ClusteringModule::generateMassDistribution()
 {
-    std::map<float, int> distribution; // {cluster mass : no of clusters}
+    std::map<float, std::vector<int>> distribution; // {cluster mass : vector of clusterIDs with that mass}
 
     // Iterate through cluster map
-    for (const auto& [_, memberVec] : getClusterMap())
+    for (const auto& [clusterID, memberVec] : getClusterMap())
     {
         float clusterMass{0};
         for (const auto& member : memberVec)
         {
             clusterMass += member->parent()->parent()->mass();
         }
-        distribution[clusterMass]++;
+        distribution[clusterMass].emplace_back(clusterID);
     }
     massDistribution_ = distribution;
 }
@@ -244,11 +242,20 @@ void ClusteringModule::generateClusterSpeciesCoordNo()
     }
     clusterSpeciesCoordNo_ = bonds;
 }
-/*
+
 // Calculate the radius of gyration of cluster sizes above the min value
-void generateRadiusOfGyration()
+void ClusteringModule::generateRadiusOfGyration()
 {
-    // First need to find the Centre of Mass of the cluster...
+    // Iterate through cluster map, skip clusters below size min
+    for (const auto& [_, clusterVec] : getClusterMap())
+    {
+        if (clusterVec.size() < gyrationMinSize_)
+        {
+            continue;
+        }
+        // Now calculate the centre of mass with regards to the origin of the configuration
+        // Collect the coordinates of each member, multiply by mass of parent, accumlate a total, then divide by the mass of the cluster
+
+    }
 
 }
-*/
