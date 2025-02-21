@@ -16,6 +16,7 @@ on:
 jobs:
 
   Checkout:
+    if: github.event.repository.fork == false
     uses: "./.github/workflows/_checkout.yml"
     with:
       bump: true
@@ -45,8 +46,8 @@ jobs:
     uses: "./.github/workflows/_website.yml"
     with:
       publishType: 'continuous'
-      displayMajorVersion: ${{ needs.Checkout.outputs.majorVersion }}
-      displayMinorVersion: ${{ needs.Checkout.outputs.minorVersion }}
+      displayMajorVersion: ${{ needs.Checkout.outputs.currentVersionMajor }}
+      displayMinorVersion: ${{ needs.Checkout.outputs.currentVersionMinor }}
       hugoVersion: ${{ needs.Checkout.outputs.hugoVersion }}
     secrets: inherit
 

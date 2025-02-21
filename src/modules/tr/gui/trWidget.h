@@ -51,6 +51,7 @@ class TRModuleWidget : public ModuleWidget
      */
     private Q_SLOTS:
     void on_PartialsButton_clicked(bool checked);
+    void on_RepresentativePartialsButton_clicked(bool checked);
     void on_TotalButton_clicked(bool checked);
     void on_FilterEdit_textChanged(QString text);
     void on_ClearFilterButton_clicked(bool checked);

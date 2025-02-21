@@ -3,7 +3,7 @@
         Script to install dependencies for Dissolve development environment in Visual Studio.
     .DESCRIPTION
         Installs the following dependencies for Dissolve (separate and prior to Conan-managed packages):
-            - Qt 6.4.2
+            - Qt6 <VERSION>
             - Freetype
             - FTGL
             - Antlr4 (Java backend)
@@ -16,6 +16,7 @@
         ANTLR version to install. Defaults to ANTLR 4.13.1.
     .PARAMETER release
         Flag - install packages for release, otherwise debug.
+
 #>
 
 param (
@@ -113,12 +114,11 @@ $systemPath = [Environment]::GetEnvironmentVariable("PATH", [EnvironmentVariable
 [Environment]::SetEnvironmentVariable("PATH", "$(Join-Path -Path $projectDir -ChildPath "msvc-env\$pythonEnvSourceDir");$systemPath", [EnvironmentVariableTarget]::Machine)
 Write-Host "Python packages directory path added to system PATH." @info_colors
 
-$qt6Dir = ""
+$qt6CMakeDir = ""
 
 if (-not [string]::IsNullOrEmpty($qtVersion))
 {
     # Install Qt6
-    $qtVersion = "6.4.2"
     $qtInstallationDir = Join-Path -Path $dependencies -ChildPath "qt"
     New-Item -ItemType Directory -Path $qtInstallationDir -ErrorAction SilentlyContinue
 
@@ -126,15 +126,16 @@ if (-not [string]::IsNullOrEmpty($qtVersion))
     aqt install-qt --outputdir $qtInstallationDir windows desktop $qtVersion win64_msvc2019_64 -m all
 
     # Export Qt6_DIR to system environment variables
-    $qt6Dir = Join-Path -Path $dependencies -ChildPath "qt\$qtVersion\msvc2019_64"
+    $qt6Dir = Join-Path -Path "$projectDir\$dependencies" -ChildPath "qt\$qtVersion\msvc2019_64"
     $qt6BinDir = Join-Path -Path $qt6Dir -ChildPath "bin"
+    $qt6CMakeDir = Join-Path -Path $qt6Dir -ChildPath "lib\cmake"
     
     Write-Host "Locating system PATH... " @info_colors
     $systemPath = [Environment]::GetEnvironmentVariable("PATH", [EnvironmentVariableTarget]::Machine)
 
     Write-Host "Adding Qt6 directory to system PATH... " @info_colors
     if ($systemPath -notmatch [regex]::Escape($qt6BinDir)) {
-        [Environment]::SetEnvironmentVariable("PATH", "$(Join-Path -Path $projectDir -ChildPath $qt6BinDir);$systemPath", [EnvironmentVariableTarget]::Machine)
+        [Environment]::SetEnvironmentVariable("PATH", "$qt6BinDir;$systemPath", [EnvironmentVariableTarget]::Machine)
         Write-Host "Qt6 binary directory path added to system PATH." @info_colors
     } else {
         Write-Host "Did not write to PATH: Qt6 binary directory path already exists in system PATH." @info_colors
@@ -267,7 +268,6 @@ $antlrOutput = "antlr-$antlrVersion-complete.jar"
 
 $javaUri = "https://download.oracle.com/java/21/latest/jdk-21_windows-x64_bin.zip"
 $javaOutput = "java.zip"
-$jdkVersion = "21.0.5"
 
 Set-Location -Path $dependencies
 
@@ -280,6 +280,8 @@ Invoke-WebRequest -Uri $javaUri -OutFile $javaOutput
 Write-Host "Unpacking Java... " @info_colors
 Expand-Archive -Path $javaOutput -DestinationPath . -Force
 Remove-Item -Path $javaOutput -Force
+
+$jdkVersion = $(Get-ChildItem -Path "." -Directory | Where-Object { $_.Name -match "^jdk-\d+\.\d+\.\d+$" } | Select-Object -ExpandProperty Name).split("-")[1]
 
 $javaSDKPath = Join-Path -Path $projectDir -ChildPath "$dependencies\jdk-$jdkVersion"
 $javaExePath = Join-Path -Path $javaSDKPath -ChildPath "bin\java"
@@ -309,7 +311,7 @@ $cacheVariables = @{
     Java_JAVA_EXECUTABLE = $javaExePath
     MULTI_THREADING = $threading
     MSVC_DEV = "ON"
-    CMAKE_PREFIX_PATH = "$qt6Dir"
+    CMAKE_PREFIX_PATH = "$qt6CMakeDir"
 }
 
 $cmakeUserPresets = [PSCustomObject]@{
