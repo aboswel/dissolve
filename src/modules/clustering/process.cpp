@@ -188,6 +188,10 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         parser.writeLineF("Cluster {}: {:.3f}\n", clusterID, radius);
     }
 
+    // Write fractal dimension diagnostics to output file
+    parser.writeLineF("\n=== Fractal Dimension ===\n");
+    parser.writeLineF("Fractal dimension: {:.3f}\n", getFractalDimension());
+
     return ExecutionResult::Success;
 }
 

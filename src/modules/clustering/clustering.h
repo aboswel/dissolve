@@ -45,6 +45,7 @@ class ClusteringModule : public Module
     Analyser::SiteMap neighbourMap_;
     std::map<int, std::vector<const Site*>> clusterMap_;
     std::map<int, int> sizeDistribution_;
+    std::map<int, float> clusterMasses_;
     std::map<float, std::vector<int>> massDistribution_;
     std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> clusterSpeciesCoordNo_;
     int minCNSize_{0};
@@ -52,6 +53,7 @@ class ClusteringModule : public Module
     std::map<int, float> radiusOfGyration_;
     int gyrationMinSize_{3};
     std::map<int, Vec3<double>> clusterCoM_; // Might be useful for later implementations, generated in radius of gyration (CoM from reference site (first member in clusterMap))
+    double fractalDimension_{-1}; // -1 for not calculated yet
 
     // Getters
     public:
@@ -59,9 +61,11 @@ class ClusteringModule : public Module
     Analyser::SiteMap& getNeighbourMap();
     std::map<int, std::vector<const Site*>>& getClusterMap();
     std::map<int, int>& getSizeDistribution();
+    std::map<int, float>& getClusterMasses();
     std::map<float, std::vector<int>>& getMassDistribution(); // Use .size() to get the number of clusters of a mass.
     std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>& getClusterSpeciesCoordNo();
     std::map<int, float>& getRadiusOfGyration();
+    double getFractalDimension();
 
     /*
      * Processing
@@ -81,6 +85,8 @@ class ClusteringModule : public Module
 
     // Calculates cluster size (No. of members) distribution from cluster map
     void generateSizeDistribution();
+    // Generates the masses of each cluster
+    void generateClusterMasses();
     // Calculates cluster mass distribution from cluster map
     void generateMassDistribution();
     // Calculates clustering coordination numbers symmetrically for each intermolecular bond. Min and Max cluster sizes to include in calc. can be specified.
@@ -88,4 +94,6 @@ class ClusteringModule : public Module
     
     // Radius of Gyration: computes "compactness" of each cluster (used in fractal dimension as well)
     void generateRadiusOfGyration();
+    // Fractal dimension: Performs linear regression on log(Radius of Gyration) - log(cluster mass), returns gradient
+    void generateFractalDimension();
 };

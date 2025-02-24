@@ -6,6 +6,7 @@
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
 #include "classes/box.h"
+#include "math/regression.h"
 #include <unordered_set>
 #include <tuple>
 #include <cmath>
@@ -38,6 +39,15 @@ std::map<int, int>& ClusteringModule::getSizeDistribution()
     return sizeDistribution_;
 }
 
+std::map<int, float>& ClusteringModule::getClusterMasses()
+{
+    if (clusterMasses_.empty())
+    {
+        generateClusterMasses();
+    }
+    return clusterMasses_;
+}
+
 std::map<float, std::vector<int>>& ClusteringModule::getMassDistribution()
 {
     if (massDistribution_.empty())
@@ -56,7 +66,6 @@ std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>&  ClusteringMo
     return clusterSpeciesCoordNo_;
 }
 
-
 std::map<int, float>& ClusteringModule::getRadiusOfGyration()
 {
     if (radiusOfGyration_.empty())
@@ -66,13 +75,20 @@ std::map<int, float>& ClusteringModule::getRadiusOfGyration()
     return radiusOfGyration_;
 }
 
+double ClusteringModule::getFractalDimension()
+{
+    if (fractalDimension_ < 0)
+    {
+        generateFractalDimension();
+    }
+    return fractalDimension_;
+}
+
 // Process functions
 // Lets move the site proximity filtering to a separate function, will to deal with all bond vectors at once. How to handle strict H bonding??
 // This needs to generate a symmetric adjacency list for a given intermolecular bond - keep this in the format of filterBySiteProximity return?
 void ClusteringModule::generateNeighbourMap()
 {
-    Analyser::SiteMap combinedNeighbourMap;
-
     for (auto bond : selectedBonds_) // Change to getter function when this is actually selected in GUI
     {
         Analyser::SiteMap neighbourMapA, neighbourMapB;
@@ -99,18 +115,17 @@ void ClusteringModule::generateNeighbourMap()
         {
             for (const auto& [site, neighbours] : neighbourMap)
             {
-                if (combinedNeighbourMap.contains(site))
+                if (neighbourMap_.contains(site))
                 {
-                    combinedNeighbourMap[site].insert(combinedNeighbourMap[site].end(), neighbours.begin(), neighbours.end());
+                    neighbourMap_[site].insert(neighbourMap_[site].end(), neighbours.begin(), neighbours.end());
                 }
                 else
                 {
-                    combinedNeighbourMap.insert({site, neighbours});
+                    neighbourMap_.insert({site, neighbours});
                 }
             }
         }
     }
-    neighbourMap_ = combinedNeighbourMap;
 }
 
 // Organise combined neighbour map into clusters
@@ -128,7 +143,6 @@ void ClusteringModule::generateClusterMap()
     //      Ought to see if theres a better way to do this...
 
     std::unordered_set<const Site*> visited;
-    std::map<int, std::vector<const Site*>> clusters; // {ClusterID : vector of sites belonging to cluster}
     std::vector<const Site*> sites;
     int clusterTrack{1};
 
@@ -151,7 +165,7 @@ void ClusteringModule::generateClusterMap()
             {
                 visited.insert(s);
             }
-            clusters[clusterTrack].insert(clusters[clusterTrack].end(), sites.begin(), sites.end());
+            clusterMap_[clusterTrack].insert(clusterMap_[clusterTrack].end(), sites.begin(), sites.end());
 
             // Use an unordered_set to collect new neighbours (avoids duplicates)
             std::unordered_set<const Site*> newNeighbours;
@@ -171,28 +185,22 @@ void ClusteringModule::generateClusterMap()
         }
         clusterTrack++;
     }
-    clusterMap_ = clusters;
 }
 
 // Basic metric computation
 // Cluster size distribution
 void ClusteringModule::generateSizeDistribution()
 {
-    std::map<int, int> distribution; // {cluster size : no of clusters}
-
     // Iterate through the cluster map
     for (const auto& [_, members] : getClusterMap())
     {
-        distribution[members.size()]++;
+        sizeDistribution_[members.size()]++;
     }
-    sizeDistribution_ = distribution;
 }
-// Cluster mass distribution
-void ClusteringModule::generateMassDistribution()
-{
-    std::map<float, std::vector<int>> distribution; // {cluster mass : vector of clusterIDs with that mass}
 
-    // Iterate through cluster map
+// Generate the masses of the clusters
+void ClusteringModule::generateClusterMasses()
+{
     for (const auto& [clusterID, memberVec] : getClusterMap())
     {
         float clusterMass{0};
@@ -200,9 +208,17 @@ void ClusteringModule::generateMassDistribution()
         {
             clusterMass += member->parent()->parent()->mass();
         }
-        distribution[clusterMass].emplace_back(clusterID);
+        clusterMasses_[clusterID] = clusterMass;
     }
-    massDistribution_ = distribution;
+}
+
+// Cluster mass distribution
+void ClusteringModule::generateMassDistribution()
+{
+    for (const auto& [clusterID, clusterMass] : getClusterMasses())
+    {
+        massDistribution_[clusterMass].emplace_back(clusterID);
+    }
 }
 // Coordination numbers for each intermolecular bond (symmetric) in cluster sizes ranging from min to max
 // Min and max values optional. 0 values indicate no restriction
@@ -210,7 +226,6 @@ void ClusteringModule::generateMassDistribution()
 // I'm not sure how useful this actually is...
 void ClusteringModule::generateClusterSpeciesCoordNo()
 {
-    std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>> bonds; // {Subject Site : {Object Site : coord No.}}
     std::map<const SpeciesSite*, int> instances;
     bool fullRange = (minCNSize_ == 0 && maxCNSize_ == 0);
 
@@ -229,7 +244,7 @@ void ClusteringModule::generateClusterSpeciesCoordNo()
                 // Find the member in the neighbour map, 
                 for (auto const& [clusterMemNbr, index] : getNeighbourMap()[clusterMem])
                 {
-                    bonds[clusterMem->parent()][clusterMemNbr->parent()]++;
+                    clusterSpeciesCoordNo_[clusterMem->parent()][clusterMemNbr->parent()]++;
                 }
             }
         }
@@ -237,12 +252,11 @@ void ClusteringModule::generateClusterSpeciesCoordNo()
     // Average the coordination numbers
     for (const auto& [siteA, num] : instances)
     {
-        for (const auto& [siteB, coordNo] : bonds[siteA])
+        for (const auto& [siteB, coordNo] : clusterSpeciesCoordNo_[siteA])
         {
-            bonds[siteA][siteB] /= num;
+            clusterSpeciesCoordNo_[siteA][siteB] /= num;
         }
     }
-    clusterSpeciesCoordNo_ = bonds;
 }
 
 // Calculate the radius of gyration of cluster sizes above the min value
@@ -259,15 +273,13 @@ void ClusteringModule::generateRadiusOfGyration()
         // Now calculate the centre of mass with regards to the origin of the configuration
         // Collect the coordinates of each member, multiply by mass of parent, accumlate a total, then divide by the mass of the cluster
         Vec3<double> massWeightedTotalVec{0,0,0};
-        double clusterMass{0}; // Easier the calculate this here rather than messing around with the mass distribution
         const Site* refSite{clusterVec[0]}; // Define a reference site (the first member of the cluster)
         for (const auto& clusterMem : clusterVec)
         {
             // Accumlate mass weighted total vector from reference site
             massWeightedTotalVec += (box->minimumVector(refSite->origin(), clusterMem->origin())) * clusterMem->parent()->parent()->mass();
-            clusterMass += clusterMem->parent()->parent()->mass();
         }
-        massWeightedTotalVec /= clusterMass;
+        massWeightedTotalVec /= getClusterMasses()[clusterID];
         clusterCoM_[clusterID] = massWeightedTotalVec;
         double massWeightedDistanceSqrd{0};
         // Now time to calculate the Radius of Gyration
@@ -277,6 +289,21 @@ void ClusteringModule::generateRadiusOfGyration()
             massWeightedDistanceSqrd += (box->minimumDistanceSquared((clusterMem->origin() - refSite->origin()), clusterCoM_[clusterID]))
                                             * clusterMem->parent()->parent()->mass();
         }
-        radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / clusterMass);
+        radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / getClusterMasses()[clusterID]);
     }
+}
+
+void ClusteringModule::generateFractalDimension()
+{
+    // Create a Data1D object of the log log plot, perform linear regression, return gradient
+    Data1D loglog;
+    loglog.initialise(radiusOfGyration_.size(), false);
+
+    // Generate Data1D
+    for (const auto& [clusterID, rg] : getRadiusOfGyration())
+    {
+        loglog.addPoint(std::log(getClusterMasses()[clusterID]), std::log(getRadiusOfGyration()[clusterID]));
+    }
+    // Perform linear regression
+    fractalDimension_ = 1/(Regression::linear(loglog, radiusOfGyration_.size()));
 }
