@@ -51,6 +51,7 @@ class ClusteringModule : public Module
     int maxCNSize_{0};
     std::map<int, float> radiusOfGyration_;
     int gyrationMinSize_{3};
+    std::map<int, Vec3<double>> clusterCoM_; // Might be useful for later implementations, generated in radius of gyration (CoM from reference site (first member in clusterMap))
 
     // Getters
     public:

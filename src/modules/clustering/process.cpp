@@ -95,9 +95,9 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     //Generate bonds between the first two sites - again, just for testing purposes. 
     BondInfo interBond(selectedSites[0], selectedSites[0], 2.5);
-    BondInfo interBond2(selectedSites[0], selectedSites[2], 2);
-    BondInfo interBond3(selectedSites[2], selectedSites[2], 2);
-    selectedBonds_ = {interBond, interBond2, interBond3}; // Will for loop this later to add each selected bond, just need one for now
+    // BondInfo interBond2(selectedSites[0], selectedSites[2], 2);
+    // BondInfo interBond3(selectedSites[2], selectedSites[2], 2);
+    selectedBonds_ = {interBond}; //, interBond2, interBond3}; // Will for loop this later to add each selected bond, just need one for now
 
     // MODULE CODE
     auto& moduleData = moduleContext.dissolve().processingModuleData();
@@ -114,9 +114,9 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     // Write header with site information
     parser.writeLineF("# Analysis for sites: {} - {}\n", 
                      selectedBonds_[0].a_->parent()->name(),
-                     selectedBonds_[0].b_->parent()->name(),
-                     selectedBonds_[1].a_->parent()->name(),
-                     selectedBonds_[1].b_->parent()->name());
+                     selectedBonds_[0].b_->parent()->name()   );
+                     //selectedBonds_[1].a_->parent()->name(),
+                     //selectedBonds_[1].b_->parent()->name());
 
     
     for (const auto& [site, neighbours] : getNeighbourMap())
@@ -180,6 +180,14 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                                 coord);
         }
     }
+
+    // Write radius of gyration diagnostics to output file
+    parser.writeLineF("\n=== Radius of Gyration ===\n");
+    for (const auto& [clusterID, radius] : getRadiusOfGyration())
+    {
+        parser.writeLineF("Cluster {}: {:.3f}\n", clusterID, radius);
+    }
+
     return ExecutionResult::Success;
 }
 

@@ -5,8 +5,10 @@
 #include "analyser/typeDefs.h"
 #include "base/sysFunc.h"
 #include "main/dissolve.h"
+#include "classes/box.h"
 #include <unordered_set>
 #include <tuple>
+#include <cmath>
 
 // Getter functions
 Analyser::SiteMap& ClusteringModule::getNeighbourMap()
@@ -246,8 +248,9 @@ void ClusteringModule::generateClusterSpeciesCoordNo()
 // Calculate the radius of gyration of cluster sizes above the min value
 void ClusteringModule::generateRadiusOfGyration()
 {
+    const Box *box = targetConfiguration_->box();
     // Iterate through cluster map, skip clusters below size min
-    for (const auto& [_, clusterVec] : getClusterMap())
+    for (const auto& [clusterID, clusterVec] : getClusterMap())
     {
         if (clusterVec.size() < gyrationMinSize_)
         {
@@ -255,7 +258,25 @@ void ClusteringModule::generateRadiusOfGyration()
         }
         // Now calculate the centre of mass with regards to the origin of the configuration
         // Collect the coordinates of each member, multiply by mass of parent, accumlate a total, then divide by the mass of the cluster
-
+        Vec3<double> massWeightedTotalVec{0,0,0};
+        double clusterMass{0}; // Easier the calculate this here rather than messing around with the mass distribution
+        const Site* refSite{clusterVec[0]}; // Define a reference site (the first member of the cluster)
+        for (const auto& clusterMem : clusterVec)
+        {
+            // Accumlate mass weighted total vector from reference site
+            massWeightedTotalVec += (box->minimumVector(refSite->origin(), clusterMem->origin())) * clusterMem->parent()->parent()->mass();
+            clusterMass += clusterMem->parent()->parent()->mass();
+        }
+        massWeightedTotalVec /= clusterMass;
+        clusterCoM_[clusterID] = massWeightedTotalVec;
+        double massWeightedDistanceSqrd{0};
+        // Now time to calculate the Radius of Gyration
+        // Need to run through the clusterMap again, get the mim sqrd distance of site from CoM using ref as origin
+        for (const auto& clusterMem : clusterVec)
+        {
+            massWeightedDistanceSqrd += (box->minimumDistanceSquared((clusterMem->origin() - refSite->origin()), clusterCoM_[clusterID]))
+                                            * clusterMem->parent()->parent()->mass();
+        }
+        radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / clusterMass);
     }
-
 }
