@@ -270,7 +270,7 @@ void ClusteringModule::generateRadiusOfGyration()
         {
             continue;
         }
-        // Now calculate the centre of mass with regards to the origin of the configuration
+        // Now calculate the centre of mass of the given cluster with regards to a reference site (first in clustermap)
         // Collect the coordinates of each member, multiply by mass of parent, accumlate a total, then divide by the mass of the cluster
         Vec3<double> massWeightedTotalVec{0,0,0};
         const Site* refSite{clusterVec[0]}; // Define a reference site (the first member of the cluster)
@@ -286,7 +286,7 @@ void ClusteringModule::generateRadiusOfGyration()
         // Need to run through the clusterMap again, get the mim sqrd distance of site from CoM using ref as origin
         for (const auto& clusterMem : clusterVec)
         {
-            massWeightedDistanceSqrd += (box->minimumDistanceSquared((clusterMem->origin() - refSite->origin()), clusterCoM_[clusterID]))
+            massWeightedDistanceSqrd += (box->minimumDistanceSquared(box->minimumVector(clusterMem->origin(), refSite->origin()), clusterCoM_[clusterID]))
                                             * clusterMem->parent()->parent()->mass();
         }
         radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / getClusterMasses()[clusterID]);
@@ -297,7 +297,7 @@ void ClusteringModule::generateFractalDimension()
 {
     // Create a Data1D object of the log log plot, perform linear regression, return gradient
     Data1D loglog;
-    loglog.initialise(radiusOfGyration_.size(), false);
+    loglog.initialise(getRadiusOfGyration().size(), false); // Add errors to this at some point?
 
     // Generate Data1D
     for (const auto& [clusterID, rg] : getRadiusOfGyration())
