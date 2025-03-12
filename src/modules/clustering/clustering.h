@@ -55,6 +55,7 @@ class ClusteringModule : public Module
     std::map<int, Vec3<double>> clusterCoM_; // Might be useful for later implementations, generated in radius of gyration (CoM from reference site (first member in clusterMap))
     double fractalDimension_{-1}; // -1 for not calculated yet
 
+    /*
     // Getters
     public:
     std::vector<BondInfo>& getSelectedBonds();
@@ -66,6 +67,7 @@ class ClusteringModule : public Module
     std::map<const SpeciesSite*, std::map<const SpeciesSite*, float>>& getClusterSpeciesCoordNo();
     std::map<int, float>& getRadiusOfGyration();
     double getFractalDimension();
+    */
 
     /*
      * Processing
@@ -78,6 +80,9 @@ class ClusteringModule : public Module
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
 
+    std::unordered_set<const Site*> buildCluster(const Site* startSite, std::unordered_set<const Site*>& visited);
+
+    /*
     // Generates a symmetric adjacency list from specified intermolecular bonds
     void generateNeighbourMap();
     // Generates a cluster map from adjacency list
@@ -96,4 +101,5 @@ class ClusteringModule : public Module
     void generateRadiusOfGyration();
     // Fractal dimension: Performs linear regression on log(Radius of Gyration) - log(cluster mass), returns gradient
     void generateFractalDimension();
+    */
 };

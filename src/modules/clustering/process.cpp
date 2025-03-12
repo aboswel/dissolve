@@ -118,8 +118,131 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                      //selectedBonds_[1].a_->parent()->name(),
                      //selectedBonds_[1].b_->parent()->name());
 
-    
-    for (const auto& [site, neighbours] : getNeighbourMap())
+
+    // Process code
+
+    // Produce NeighbourMap
+    for (auto bond : selectedBonds_) // Change to getter function when this is actually selected in GUI
+    {
+        Analyser::SiteMap neighbourMapA, neighbourMapB;
+
+        // Transform SiteObjects to instances ready for the filter function
+        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite *>{bond.a_});
+        const Analyser::SiteVector &siteVectorA = selectionA.sites();
+
+        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite *>{bond.b_});
+        const Analyser::SiteVector &siteVectorB = selectionB.sites();
+
+        SiteFilter filterA(targetConfiguration_, siteVectorA);
+        std::tie(std::ignore, neighbourMapA) =
+            filterA.filterBySiteProximity(siteVectorB, Range(0.001, bond.cutOff), 1, 100); // min of 0.01 to avoid self-bonding
+
+        // If we're dealing with a bond between the same site, it's already symmetric. Running twice will add dupes
+        if (bond.a_ != bond.b_)
+        {
+            SiteFilter filterB(targetConfiguration_, siteVectorB);
+            std::tie(std::ignore, neighbourMapB) =
+                filterB.filterBySiteProximity(siteVectorA, Range(0.001, bond.cutOff), 1, 100);
+        }
+
+        // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
+        // neighbours if exists.
+        for (auto neighbourMap : {neighbourMapA, neighbourMapB})
+        {
+            for (const auto &[site, neighbours] : neighbourMap)
+            {
+                if (neighbourMap_.contains(site))
+                    neighbourMap_[site].insert(neighbourMap_[site].end(), neighbours.begin(), neighbours.end());
+                else
+                    neighbourMap_.insert({site, neighbours});
+            }
+        }
+    }
+
+    // ClusterMap generation 1.0
+    /*
+    // We need to traverse the cluster:
+    //      We need a starting site (sites) - This is the first site in the cluster (iterate down neighbourmap for this)
+    //      From this site, we list all the neighbours
+    //      We purge neighbours that exist in the visited set
+    //      Those that are left, are put in the visited set and added to the cluster
+    //      Once added, these neighbours now become sites
+    //      All neighbours of these sites are now found, purged, added and become next sites
+    //      Continue until there are no more valid neighbours. Then we iterate down the siteMap until we find the next unvisited site, repeat process.
+    //      Ought to see if theres a better way to do this... Recursive implementation?
+
+    std::unordered_set<const Site*> visited;
+    std::vector<const Site*> sites;
+    int clusterTrack{1};
+
+    for (const auto &[clusterStart, _] : neighbourMap_)
+    {
+        // check if the selected site has been visited.
+        if (visited.contains(clusterStart))
+        {
+            continue;
+        }
+
+        // cluster start becomes sites
+        sites.emplace_back(clusterStart);
+
+        // While loop continues for this cluster until sites ends up empty, effectively until there are no more unvisited
+        // neighbours
+        while (!sites.empty())
+        {
+            // Add sites to visited and cluster
+            for (const auto &s : sites)
+            {
+                visited.insert(s);
+            }
+            clusterMap_[clusterTrack].insert(clusterMap_[clusterTrack].end(), sites.begin(), sites.end());
+
+            // Use an unordered_set to collect new neighbours (avoids duplicates)
+            std::unordered_set<const Site *> newNeighbours;
+            for (const auto &si : sites)
+            {
+                for (const auto &nbr : neighbourMap_[si])
+                {
+                    if (visited.contains(std::get<0>(nbr)))
+                    {
+                        continue;
+                    }
+                    newNeighbours.insert(std::get<0>(nbr));
+                }
+            }
+            // Convert the set of newNeighbours to a vector and use as next sites
+            sites.assign(newNeighbours.begin(), newNeighbours.end());
+        }
+        clusterTrack++;
+    }
+    */
+
+    // Cluster size distribution
+    for (const auto& [_, members] : clusterMap_)
+    {
+        sizeDistribution_[members.size()]++;
+    }
+
+    // Cluster mass calculation
+    for (const auto& [clusterID, memberVec] : clusterMap_)
+    {
+        float clusterMass{0};
+        for (const auto& member : memberVec)
+        {
+            clusterMass += member->parent()->parent()->mass();
+        }
+        clusterMasses_[clusterID] = clusterMass;
+    }
+
+    // Cluster mass distribution
+    for (const auto& [clusterID, clusterMass] : clusterMasses_)
+    {
+        massDistribution_[clusterMass].emplace_back(clusterID);
+    }
+
+
+    // Diagnostics
+    for (const auto& [site, neighbours] : neighbourMap_)
     {
         parser.writeLineF("\nSite '{}', at coordinates ({:.3f}, {:.3f}, {:.3f}) : {} neighbours\n\n", 
                     site->parent()->name(), 
@@ -138,7 +261,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     // After clustersOut is generated, print diagnostics:
     parser.writeLineF("\n=== Cluster Diagnostics ===\n");
-    for (const auto& [clusterId, clusterSites] : getClusterMap())
+    for (const auto& [clusterId, clusterSites] : clusterMap_)
     {
         parser.writeLineF("Cluster {}: {} site(s)\n", clusterId, clusterSites.size());
         for (const auto& site : clusterSites)
@@ -152,14 +275,14 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     // Write clusters and other diagnostics...
     // Now compute the cluster size distribution and output it
     parser.writeLineF("\n=== Cluster Size Distribution ===\n");
-    for (const auto& [clusterSize, count] : getSizeDistribution())
+    for (const auto& [clusterSize, count] : sizeDistribution_)
     {
         parser.writeLineF("  Cluster Size {} : {} clusters\n", clusterSize, count);
     }
 
     // Compute mass distribution diagnostic
     parser.writeLineF("\n=== Cluster Mass Distribution ===\n");
-    for (const auto& [clusterMass, clusterVec] : getMassDistribution())
+    for (const auto& [clusterMass, clusterVec] : massDistribution_)
     {
         for (const auto& cluster : clusterVec)
         {
@@ -168,6 +291,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     }
 
+/*
     // Write coordination number diagnostics to output file
     parser.writeLineF("\n=== Coordination Numbers ===\n");
     for (const auto& [siteA, innerMap] : getClusterSpeciesCoordNo())
@@ -191,6 +315,8 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     // Write fractal dimension diagnostics to output file
     parser.writeLineF("\n=== Fractal Dimension ===\n");
     parser.writeLineF("Fractal dimension: {:.3f}\n", getFractalDimension());
+
+    */
 
     return ExecutionResult::Success;
 }
