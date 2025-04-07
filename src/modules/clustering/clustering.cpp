@@ -24,5 +24,4 @@ ClusteringModule::ClusteringModule() : Module(ModuleTypes::Clustering)
     keywords_.setOrganisation("Options", "Display");
     keywords_.add<IntegerKeyword>("Minimum cluster size to display", "No clusters below this threshold will show in the output visualiser", minClusterForConfig_);
     keywords_.add<IntegerKeyword>("Maximum cluster size to display", "No clusters above this threshold will show in the output visualiser", maxClusterForConfig_);
-
 }
