@@ -1,19 +1,22 @@
-name: Detect Release
-description: Runs on any merged release PR (actioned by prepare_release.yml)
+name: Recreate Release
+description: A purely workflow dispatch action that re-releases a version based on a specific commit SHA pointing to a "[Release]"-prefixed merge commit.
 
 on:
-  pull_request:
-    types:
-      - closed
+  workflow_dispatch:
+    inputs:
+      releaseBranch:
+        description: The target release branch suffix, e.g. 1.7.X, to build
+        type: string
+        required: true
+        default: ""
 
 jobs:
 
   Checkout:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, '[Release]')
     uses: "./.github/workflows/_checkout.yml"
     secrets: inherit
     with:
-      checkoutRef: ${{ github.event.pull_request.merge_commit_sha }}
+      checkoutRef: "release/${{ inputs.releaseBranch }}"
       publishType: 'release'
 
   BuildAndPackage:
