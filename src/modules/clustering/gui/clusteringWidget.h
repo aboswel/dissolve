@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include "gui/configurationViewer.h"
 #include "modules/clustering/gui/ui_clusteringWidget.h"
 #include "modules/widget.h"
+#include "gui/configurationViewerWidget.h"
 
 // Forward Declarations
 class ClusteringModule;
@@ -18,9 +20,15 @@ class ClusteringModuleWidget : public ModuleWidget
     private:
     // Associated Module
     ClusteringModule *module_;
+    ConfigurationViewerWidget *viewerWidget_{nullptr};
+    Configuration *clusterConfiguration_{nullptr}; 
+    bool refreshing_{false};
 
     public:
     ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve);
+    
+    private:
+    void updateControls();
 
     /*
      * UI
@@ -28,4 +36,9 @@ class ClusteringModuleWidget : public ModuleWidget
     private:
     // Main form declaration
     Ui::ClusteringModuleWidget ui_;
+
+    private Q_SLOTS:
+    void on_refreshButton_clicked();
+
+    
 };

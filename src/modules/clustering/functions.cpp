@@ -1,3 +1,4 @@
+/*
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 Team Dissolve and contributors
 
@@ -307,3 +308,5 @@ void ClusteringModule::generateFractalDimension()
     // Perform linear regression
     fractalDimension_ = 1/(Regression::linear(loglog, radiusOfGyration_.size()));
 }
+
+*/
