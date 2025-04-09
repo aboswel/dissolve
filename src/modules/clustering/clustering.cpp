@@ -21,10 +21,4 @@ ClusteringModule::ClusteringModule() : Module(ModuleTypes::Clustering)
     keywords_.add<SpeciesSiteKeyword>("SiteB", "Choose the second site for cluster definition", userSites_.b_);
     keywords_.add<DoubleKeyword>("Cut-off", "The maximum distance between sites for them to be considered clustered",
                                  userSites_.cutOff);
-
-    keywords_.setOrganisation("Options", "Display");
-    keywords_.add<IntegerKeyword>("Minimum cluster size to display",
-                                  "No clusters below this threshold will show in the output visualiser", minClusterForConfig_);
-    keywords_.add<IntegerKeyword>("Maximum cluster size to display",
-                                  "No clusters above this threshold will show in the output visualiser", maxClusterForConfig_);
 }

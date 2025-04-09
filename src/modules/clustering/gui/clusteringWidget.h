@@ -7,6 +7,7 @@
 #include "gui/configurationViewerWidget.h"
 #include "modules/clustering/gui/ui_clusteringWidget.h"
 #include "modules/widget.h"
+#include <QListWidget>
 
 // Forward Declarations
 class ClusteringModule;
@@ -21,14 +22,16 @@ class ClusteringModuleWidget : public ModuleWidget
     ClusteringModule *module_;
     // Pointer to cluster config for visualisation (maybe just use the module config?)
     Configuration *clusterConfiguration_{nullptr};
-    // I don't understand what this does but the other modules have it
-    bool refreshing_{false};
+    // Integers for which clusters to display
+    int displaySize_{0}, displayID_{0};
 
     public:
     ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve);
 
     private:
     void updateControls();
+    void buildSizeList();
+    void buildIDList(QListWidgetItem *item);
 
     /*
      * UI
@@ -39,4 +42,6 @@ class ClusteringModuleWidget : public ModuleWidget
 
     private Q_SLOTS:
     void on_refreshButton_clicked();
+    void on_listWidget_itemClicked(QListWidgetItem *item);
+    void on_listWidget2_itemClicked(QListWidgetItem *item);
 };
