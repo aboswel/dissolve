@@ -21,7 +21,6 @@ class ClusteringModuleWidget : public ModuleWidget
     ClusteringModule *module_;
     // Pointer to cluster config for visualisation (maybe just use the module config?)
     Configuration *clusterConfiguration_{nullptr};
-    // I don't understand what this does but the other modules have it
     bool refreshing_{false};
 
     public:
