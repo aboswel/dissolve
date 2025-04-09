@@ -81,7 +81,6 @@ class ClusteringModule : public Module
     /*
      * Processing
      */
-
     private:
     // Run main processing
     Module::ExecutionResult process(ModuleContext &moduleContext) override;
