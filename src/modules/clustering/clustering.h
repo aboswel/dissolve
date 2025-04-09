@@ -43,13 +43,13 @@ class ClusteringModule : public Module
     // GUI site and cutoff selection
     BondInfo userSites_{nullptr, nullptr, -1};
     // Vector of selected cluster definitions (when multiple can be defined)
-    std::vector<BondInfo> selectedBonds_;
+    std::vector<BondInfo> selectedDefinitions_;
     // Map of neighbours for every site (symmetric)
     Analyser::SiteMap neighbourMap_{};
     // Map of every member in every cluster
     std::map<int, std::vector<const Site *>> clusterMap_{};
-    // Map of cluster ID to size of cluster
-    std::map<int, int> sizeDistribution_{};
+    // Map of size to no. of clusters of that size
+    std::map<int, std::vector<int>> sizeDistribution_{};
     // Map of cluster ID to mass of cluster
     std::map<int, float> clusterMasses_{};
     // Map of mass to vector of cluster IDs (useful for processing)
@@ -69,12 +69,6 @@ class ClusteringModule : public Module
     std::map<int, Vec3<double>> clusterCoM_;
     // Fractal dimension from linear regression of LogLog Radius of gyration - cluster mass
     double fractalDimension_{-1};
-    // Minimum cluster size to display
-    int minClusterForConfig_{5};
-    // Maximum cluster size to display
-    int maxClusterForConfig_{10000};
-    // Tracks if the clusters have been generated yet
-    bool clustersConfigGenerated_{false};
     // Pointer to the cluster display configuration
     Configuration *clusterConfig_{nullptr};
 
@@ -91,13 +85,11 @@ class ClusteringModule : public Module
     // Set up module for processing
     bool setUp(ModuleContext &moduleContext, Flags<KeywordBase::KeywordSignal> actionSignals) override;
     // Generation of the cluster visualisation configuration
-    Configuration *generateClustersConfig(Dissolve *dissolve, Configuration *source);
+    Configuration *generateClustersConfig(Dissolve *dissolve, Configuration *source, int displaySize, int displayID);
     // Getter for the target configuration of the module
     Configuration *getSourceConfig();
-    // Radius of Gyration: computes "compactness" of each cluster (used in fractal dimension as well)
-    void generateRadiusOfGyration();
-    // Fractal dimension: Performs linear regression on log(Radius of Gyration) - log(cluster mass), returns gradient
-    void generateFractalDimension();
+    // Get the size distribution
+    std::map<int, std::vector<int>> &getSizeDistribution() { return sizeDistribution_; }
     // Ensures we don't visualise the config before it's ready (still necessary?)
     bool viewingReady{false};
 };
