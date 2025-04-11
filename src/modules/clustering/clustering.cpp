@@ -17,8 +17,8 @@ ClusteringModule::ClusteringModule() : Module(ModuleTypes::Clustering)
         ->setEditSignals({KeywordBase::ClearModuleData, KeywordBase::RecreateRenderables});
 
     keywords_.setOrganisation("Options", "Sites");
-    keywords_.add<SpeciesSiteKeyword>("SiteA", "Choose the first site for cluster definition", userSites_.a_);
-    keywords_.add<SpeciesSiteKeyword>("SiteB", "Choose the second site for cluster definition", userSites_.b_);
+    keywords_.add<SpeciesSiteKeyword>("SiteA", "Choose the first site for cluster definition", a_);
+    keywords_.add<SpeciesSiteKeyword>("SiteB", "Choose the second site for cluster definition", b_);
     keywords_.add<DoubleKeyword>("Cut-off", "The maximum distance between sites for them to be considered clustered",
-                                 userSites_.cutOff);
+                                 cutoff_);
 }

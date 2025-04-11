@@ -31,20 +31,11 @@ class ClusteringModule : public Module
     Configuration *targetConfiguration_{nullptr};
 
     // Simulation data...
-    // Struct
-    struct BondInfo
-    {
-        const SpeciesSite *a_, *b_;
-        double cutOff;
-
-        BondInfo(const SpeciesSite *site1, const SpeciesSite *site2, double cut) : a_(site1), b_(site2), cutOff(cut) {}
-    };
-
-    // GUI site and cutoff selection
-    BondInfo userSites_{nullptr, nullptr, -1};
-    // Vector of selected cluster definitions (when multiple can be defined)
-    std::vector<BondInfo> selectedDefinitions_;
-    // Map of neighbours for every site (symmetric)
+    // Sites involved in the cluster
+    const SpeciesSite *a_, *b_;
+    // Maximum allowed distance for the two sites to be considered in the same cluster
+    double cutoff_{3.0}; 
+    // Symmetric map of all sites to all neighbour sites
     Analyser::SiteMap neighbourMap_{};
     // Map of every member in every cluster
     std::map<int, std::vector<const Site *>> clusterMap_{};

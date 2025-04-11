@@ -39,6 +39,7 @@ class ClusteringModuleWidget : public ModuleWidget
     private:
     // Main form declaration
     Ui::ClusteringModuleWidget ui_;
+    DataViewer *sizeDist_, *massDist_;
 
     private Q_SLOTS:
     void on_refreshButton_clicked();

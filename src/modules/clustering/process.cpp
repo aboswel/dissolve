@@ -20,8 +20,6 @@ bool ClusteringModule::setUp(ModuleContext &moduleContext, Flags<KeywordBase::Ke
             Messenger::print("Removed existing cluster configuration");
         }
     }
-    // Clear all existing data
-    selectedDefinitions_.clear();
     return true;
 }
 
@@ -29,69 +27,59 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 {
     auto &moduleData = moduleContext.dissolve().processingModuleData();
 
-    if (!(userSites_.a_ && userSites_.b_ && (userSites_.cutOff > 0)))
+    if (!(a_ && b_ && (cutoff_ > 0)))
     {
         Messenger::error("Cluster definition invalid!");
         return ExecutionResult::Failed;
     }
 
-    selectedDefinitions_.emplace_back(userSites_);
-
     // Process code
     // Produce NeighbourMap
     neighbourMap_.clear();
-    for (auto definition : selectedDefinitions_)
+    Analyser::SiteMap neighbourMapA, neighbourMapB;
+
+    // Transform SiteObjects to instances ready for the filter function
+    SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite *>{a_});
+    const Analyser::SiteVector &siteVectorA = selectionA.sites();
+
+    SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite *>{b_});
+    const Analyser::SiteVector &siteVectorB = selectionB.sites();
+
+    SiteFilter filterA(targetConfiguration_, siteVectorA);
+    std::tie(std::ignore, neighbourMapA) = filterA.filterBySiteProximity(siteVectorB, Range(0.001, cutoff_), 1,
+                                                                         100); // min of 0.01 to avoid self-selection
+
+    // If we're dealing with a definition between the same site, it's already symmetric. Running twice will add dupes
+    if (a_ != b_)
     {
-        Analyser::SiteMap neighbourMapA, neighbourMapB;
-
-        // Transform SiteObjects to instances ready for the filter function
-        SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite *>{definition.a_});
-        const Analyser::SiteVector &siteVectorA = selectionA.sites();
-
-        SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite *>{definition.b_});
-        const Analyser::SiteVector &siteVectorB = selectionB.sites();
-
-        SiteFilter filterA(targetConfiguration_, siteVectorA);
-        std::tie(std::ignore, neighbourMapA) =
-            filterA.filterBySiteProximity(siteVectorB, Range(0.001, definition.cutOff), 1, 100); // min of 0.01 to avoid self-selection
-
-        // If we're dealing with a definition between the same site, it's already symmetric. Running twice will add dupes
-        if (definition.a_ != definition.b_)
-        {
-            SiteFilter filterB(targetConfiguration_, siteVectorB);
-            std::tie(std::ignore, neighbourMapB) =
-                filterB.filterBySiteProximity(siteVectorA, Range(0.001, definition.cutOff), 1, 100);
-        }
-
-        // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
-        // neighbours if exists.
-        for (auto neighbourMap : {neighbourMapA, neighbourMapB})
-        {
-            for (const auto &[site, neighbours] : neighbourMap)
-            {
-                if (neighbourMap_.contains(site))
-                    neighbourMap_[site].insert(neighbourMap_[site].end(), neighbours.begin(), neighbours.end());
-                else
-                    neighbourMap_.insert({site, neighbours});
-            }
-        }
+        SiteFilter filterB(targetConfiguration_, siteVectorB);
+        std::tie(std::ignore, neighbourMapB) = filterB.filterBySiteProximity(siteVectorA, Range(0.001, cutoff_), 1, 100);
     }
 
-    // ClusterMap generation 2.0
-    {
-        clusterMap_.clear();
-        std::unordered_set<const Site *> processed;
-        int clusterTrack{1};
-        for (const auto &[clusterStart, _] : neighbourMap_)
+    // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
+    // neighbours if exists.
+    for (auto neighbourMap : {neighbourMapA, neighbourMapB})
+        for (const auto &[site, neighbours] : neighbourMap)
         {
-            if (!processed.contains(clusterStart))
-            {
-                std::unordered_set<const Site *> visited{clusterStart};
-                buildCluster(clusterStart, visited);
-                processed.insert(visited.begin(), visited.end());
-                clusterMap_.insert({clusterTrack, std::vector<const Site *>(visited.begin(), visited.end())});
-                clusterTrack++;
-            }
+            if (neighbourMap_.contains(site))
+                neighbourMap_[site].insert(neighbourMap_[site].end(), neighbours.begin(), neighbours.end());
+            else
+                neighbourMap_.insert({site, neighbours});
+        }
+
+    // ClusterMap generation 2.0
+    clusterMap_.clear();
+    std::unordered_set<const Site *> processed;
+    auto clusterTrack = 1;
+    for (const auto &[clusterStart, _] : neighbourMap_)
+    {
+        if (!processed.contains(clusterStart))
+        {
+            std::unordered_set<const Site *> visited{clusterStart};
+            buildCluster(clusterStart, visited);
+            processed.insert(visited.begin(), visited.end());
+            clusterMap_.insert({clusterTrack, std::vector<const Site *>(visited.begin(), visited.end())});
+            clusterTrack++;
         }
     }
 
@@ -99,6 +87,11 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     sizeDistribution_.clear();
     for (const auto &[clusterID, members] : clusterMap_)
         sizeDistribution_[members.size()].emplace_back(clusterID);
+
+    auto &sizeData = moduleData.realise<Data1D>("SizeDist", name());
+    sizeData.clear();
+    for (const auto &[size, mems] : sizeDistribution_)
+        sizeData.addPoint(std::log(size), std::log(mems.size()));
 
     // Cluster mass calculation
     clusterMasses_.clear();
@@ -116,54 +109,50 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
     for (const auto &[clusterID, clusterMass] : clusterMasses_)
         massDistribution_[clusterMass].emplace_back(clusterID);
 
+    auto &massData = moduleData.realise<Data1D>("MassDist", name());
+    massData.clear();
+    for (const auto &[mass, mems] : massDistribution_)
+        massData.addPoint(std::log(mass), std::log(mems.size()));
+
     // Generation of radius of gyration
+    radiusOfGyration_.clear();
+    const auto *box = targetConfiguration_->box();
+    for (const auto &[clusterID, clusterVec] : clusterMap_)
     {
-        radiusOfGyration_.clear();
-        const Box *box = targetConfiguration_->box();
-        // Iterate through cluster map, skip clusters below size min
-        for (const auto &[clusterID, clusterVec] : clusterMap_)
-        {
-            if (clusterVec.size() < gyrationMinSize_)
-                continue;
+        if (clusterVec.size() < gyrationMinSize_)
+            continue;
 
-            // Now calculate the centre of mass of the given cluster with regards to a reference site (first in clustermap)
-            // Collect the coordinates of each member, multiply by mass of parent, accumlate a total, then divide by the mass of
-            // the cluster
-            Vec3<double> massWeightedTotalVec{0, 0, 0};
-            const Site *refSite{clusterVec[0]}; // Define a reference site (the first member of the cluster)
-            for (const auto &clusterMem : clusterVec)
-                // Accumlate mass weighted total vector from reference site
-                massWeightedTotalVec +=
-                    (box->minimumVector(refSite->origin(), clusterMem->origin())) * clusterMem->parent()->parent()->mass();
+        // CoM mass weighted calc from reference site
+        Vec3<double> massWeightedTotalVec{0, 0, 0};
+        const auto *refSite{clusterVec[0]}; // Reference as first member in cluster
+        for (const auto &clusterMem : clusterVec)
+            massWeightedTotalVec +=
+                (box->minimumVector(refSite->origin(), clusterMem->origin())) * clusterMem->parent()->parent()->mass();
 
-            massWeightedTotalVec /= clusterMasses_[clusterID];
-            clusterCoM_[clusterID] = massWeightedTotalVec;
-            double massWeightedDistanceSqrd{0};
-            // Now time to calculate the Radius of Gyration
-            // Need to run through the clusterMap again, get the mim sqrd distance of site from CoM using ref as origin
-            for (const auto &clusterMem : clusterVec)
-                massWeightedDistanceSqrd +=
-                    (box->minimumDistanceSquared(box->minimumVector(clusterMem->origin(), refSite->origin()),
-                                                 clusterCoM_[clusterID])) *
-                    clusterMem->parent()->parent()->mass();
+        massWeightedTotalVec /= clusterMasses_[clusterID];
+        clusterCoM_[clusterID] = massWeightedTotalVec;
+        auto massWeightedDistanceSqrd = 0.0;
 
-            radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / clusterMasses_[clusterID]);
-        }
+        // Run through again for mass weighted distance squared
+        for (const auto &clusterMem : clusterVec)
+            massWeightedDistanceSqrd +=
+                (box->minimumDistanceSquared(box->minimumVector(clusterMem->origin(), refSite->origin()),
+                                             clusterCoM_[clusterID])) *
+                clusterMem->parent()->parent()->mass();
+
+        radiusOfGyration_[clusterID] = std::sqrt(massWeightedDistanceSqrd / clusterMasses_[clusterID]);
     }
 
-    // Calculate the fractal dimension from radius of gyration
-    {
-        // Create a Data1D object of the log log plot, perform linear regression, return gradient
-        Data1D loglog;
-        loglog.initialise(radiusOfGyration_.size(), false); // Add errors to this at some point?
+    // Fractal Dimension: Create a Data1D object of the log log plot, perform linear regression, return gradient
+    Data1D loglog;
+    loglog.initialise(radiusOfGyration_.size(), false); // Add errors to this at some point?
 
-        // Generate Data1D
-        for (const auto &[clusterID, rg] : radiusOfGyration_)
-            loglog.addPoint(std::log(radiusOfGyration_[clusterID]), std::log(clusterMasses_[clusterID]));
+    // Generate Data1D
+    for (const auto &[clusterID, rg] : radiusOfGyration_)
+        loglog.addPoint(std::log(radiusOfGyration_[clusterID]), std::log(clusterMasses_[clusterID]));
 
-        // Perform linear regression
-        fractalDimension_ = (Regression::linear(loglog, radiusOfGyration_.size()));
-    }
+    // Perform linear regression
+    fractalDimension_ = (Regression::linear(loglog, radiusOfGyration_.size()));
 
     viewingReady = true;
 
@@ -181,8 +170,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         }
 
         // Write header with site information
-        parser.writeLineF("# Analysis for sites: {} - {}\n", selectedDefinitions_[0].a_->parent()->name(),
-                        selectedDefinitions_[0].b_->parent()->name());
+        parser.writeLineF("# Analysis for sites: {} - {}\n", a_->parent()->name(), b_->parent()->name());
 
         // Write clusters and other diagnostics...
         // Now compute the cluster size distribution and output it
@@ -193,10 +181,8 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         // Compute mass distribution diagnostic
         parser.writeLineF("\n=== Cluster Mass Distribution ===\n");
         for (const auto &[clusterMass, clusterVec] : massDistribution_)
-        {
             for (const auto &cluster : clusterVec)
                 parser.writeLineF("  Cluster Mass {:.3f} : cluster ID: {}\n", clusterMass, cluster);
-        }
 
         // Write radius of gyration diagnostics to output file
         parser.writeLineF("\n=== Radius of Gyration ===\n");
@@ -223,7 +209,6 @@ void ClusteringModule::buildCluster(const Site *startSite, std::unordered_set<co
     }
 }
 
-// Whole analysis breaks if we get a configuration of zero atoms, min/ max tweaks require an interation to take place?
 Configuration *ClusteringModule::generateClustersConfig(Dissolve *dissolve, Configuration *source, int displaySize,
                                                         int displayID)
 {
@@ -237,32 +222,28 @@ Configuration *ClusteringModule::generateClustersConfig(Dissolve *dissolve, Conf
     // If the configuration exists, empty it
     else
         clusterConfig_->empty();
-
+    // Display all clusters
     if (displaySize == 0)
     {
         for (const auto &[clusterID, mems] : clusterMap_)
-        {
             for (const auto &site : mems)
             {
                 auto copyableMolecule = std::make_shared<Molecule>(*site->molecule());
                 clusterConfig_->copyMolecule(copyableMolecule);
             }
-        }
     }
+    // Display all clusters of size displaySize
     else if (displaySize != 0 && displayID == 0)
     {
         for (const auto &[clusterID, mems] : clusterMap_)
-        {
             if (mems.size() == displaySize)
-            {
                 for (const auto &site : mems)
                 {
                     auto copyableMolecule = std::make_shared<Molecule>(*site->molecule());
                     clusterConfig_->copyMolecule(copyableMolecule);
                 }
-            }
-        }
     }
+    // Display cluster with ID displayID
     else if (displaySize != 0 && displayID != 0)
     {
         for (const auto &site : clusterMap_[displayID])
