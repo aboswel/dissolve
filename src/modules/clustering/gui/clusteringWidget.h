@@ -24,12 +24,13 @@ class ClusteringModuleWidget : public ModuleWidget
     Configuration *clusterConfiguration_{nullptr};
     // Integers for which clusters to display
     int displaySize_{0}, displayID_{0};
+    bool refreshing_{false};
 
     public:
     ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve);
+    void updateControls(const Flags<ModuleWidget::UpdateFlags> &updateFlags = {}) override;
 
     private:
-    void updateControls();
     void buildSizeList();
     void buildIDList(QListWidgetItem *item);
 
@@ -42,7 +43,6 @@ class ClusteringModuleWidget : public ModuleWidget
     DataViewer *sizeDist_, *massDist_;
 
     private Q_SLOTS:
-    void on_refreshButton_clicked();
     void on_listWidget_itemClicked(QListWidgetItem *item);
     void on_listWidget2_itemClicked(QListWidgetItem *item);
 };

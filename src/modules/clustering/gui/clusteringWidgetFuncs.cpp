@@ -34,12 +34,19 @@ ClusteringModuleWidget::ClusteringModuleWidget(QWidget *parent, ClusteringModule
     viewM.setAutoFollowType(View::AllAutoFollow);
 }
 
-void ClusteringModuleWidget::updateControls()
+void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlags> &updateFlags)
 {
-    // Check eveything is ready
-    if (!module_->viewingReady)
+    if (refreshing_)
         return;
 
+    refreshing_ = true;
+
+    // Check eveything is ready
+    if (!module_->viewingReady)
+    {
+        refreshing_ = false;
+        return;
+    }
     // Set the new configuration and redraw the visualisation. Is there a way to set the style to spheres view from here (lines
     // arent showing)?
     clusterConfiguration_ = module_->generateClustersConfig(&dissolve_, module_->getSourceConfig(), displaySize_, displayID_);
@@ -48,18 +55,23 @@ void ClusteringModuleWidget::updateControls()
     ui_.ViewerWidget->postRedisplay();
 
     // Configure the size/mass histograms
-    sizeDist_->clearRenderables();
-    massDist_->clearRenderables();
+    if (updateFlags.isSet(ModuleWidget::RecreateRenderablesFlag) || sizeDist_->renderables().empty() ||
+        massDist_->renderables().empty())
+    {
+        buildSizeList();
+        sizeDist_->clearRenderables();
+        massDist_->clearRenderables();
 
-    if (sizeDist_->renderables().empty())
-        sizeDist_->createRenderable<RenderableData1D>(std::format("{}//SizeDist", module_->name()),
-                                                      std::format("SizeDist//{}", module_->getSourceConfig()->niceName()),
-                                                      module_->getSourceConfig()->niceName());
+        if (sizeDist_->renderables().empty())
+            sizeDist_->createRenderable<RenderableData1D>(std::format("{}//SizeDist", module_->name()),
+                                                          std::format("SizeDist//{}", module_->getSourceConfig()->niceName()),
+                                                          module_->getSourceConfig()->niceName());
 
-    if (massDist_->renderables().empty())
-        massDist_->createRenderable<RenderableData1D>(std::format("{}//MassDist", module_->name()),
-                                                      std::format("MassDist//{}", module_->getSourceConfig()->niceName()),
-                                                      module_->getSourceConfig()->niceName());
+        if (massDist_->renderables().empty())
+            massDist_->createRenderable<RenderableData1D>(std::format("{}//MassDist", module_->name()),
+                                                          std::format("MassDist//{}", module_->getSourceConfig()->niceName()),
+                                                          module_->getSourceConfig()->niceName());
+    }
 
     sizeDist_->validateRenderables(dissolve_.processingModuleData());
     massDist_->validateRenderables(dissolve_.processingModuleData());
@@ -67,6 +79,8 @@ void ClusteringModuleWidget::updateControls()
     ui_.MassPlot->updateToolbar();
     sizeDist_->postRedisplay();
     massDist_->postRedisplay();
+
+    refreshing_ = false;
 }
 
 void ClusteringModuleWidget::buildSizeList()
@@ -103,12 +117,6 @@ void ClusteringModuleWidget::buildIDList(QListWidgetItem *item)
         cell->setFlags(cell->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
         ui_.listWidget2->addItem(cell);
     }
-}
-
-void ClusteringModuleWidget::on_refreshButton_clicked()
-{
-    buildSizeList();
-    updateControls();
 }
 
 void ClusteringModuleWidget::on_listWidget_itemClicked(QListWidgetItem *item) { buildIDList(item); }
