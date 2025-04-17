@@ -29,12 +29,14 @@ class ClusteringModule : public Module
     private:
     // Target configurations
     Configuration *targetConfiguration_{nullptr};
-
-    // Simulation data...
     // Sites involved in the cluster
-    const SpeciesSite *a_, *b_;
+    const SpeciesSite *a_{nullptr}, *b_{nullptr};
     // Maximum allowed distance for the two sites to be considered in the same cluster
-    double cutoff_{3.0}; 
+    double cutoff_{3.0};
+    // Strict (directional) definition
+    bool strict_{false};
+    // Angle constraint for strictness (+- deviation from 180)
+    double angleDev_{20};
     // Symmetric map of all sites to all neighbour sites
     Analyser::SiteMap neighbourMap_{};
     // Map of every member in every cluster
@@ -52,7 +54,7 @@ class ClusteringModule : public Module
     // Maximum cluster size to count in coordination number calc
     int maxCNSize_{0};
     // Map of cluster ID to radius of gyration
-    std::map<int, float> radiusOfGyration_;
+    std::map<int, double> radiusOfGyration_;
     // Minimum size to include in radius of gyration calculation
     int gyrationMinSize_{10};
     // Map of cluster ID to CoM vector from reference site (first member in cluster map) - Required in Rg calc. Might be useful
@@ -61,7 +63,13 @@ class ClusteringModule : public Module
     // Fractal dimension from linear regression of LogLog Radius of gyration - cluster mass
     double fractalDimension_{-1};
     // Pointer to the cluster display configuration
-    Configuration *clusterConfig_{nullptr};
+    Configuration clusterConfig_;
+    // Tracker to ensure we don't unnecessarily recreate the visualisation config
+    bool configMade{false};
+    // Export keywords
+    bool saveSizeDist_{false};
+    bool saveMassDist_{false};
+    bool saveRgMass_{false};
 
     /*
      * Processing
@@ -73,14 +81,16 @@ class ClusteringModule : public Module
     void buildCluster(const Site *startSite, std::unordered_set<const Site *> &visited);
 
     public:
-    // Set up module for processing
+    // Set up module for processings
     bool setUp(ModuleContext &moduleContext, Flags<KeywordBase::KeywordSignal> actionSignals) override;
     // Generation of the cluster visualisation configuration
-    Configuration *generateClustersConfig(Dissolve *dissolve, Configuration *source, int displaySize, int displayID);
+    void generateClustersConfig(Dissolve &dissolve, int displaySize, int displayID);
     // Getter for the target configuration of the module
     Configuration *getSourceConfig();
     // Get the size distribution
-    std::map<int, std::vector<int>> &getSizeDistribution() { return sizeDistribution_; }
+    std::map<int, std::vector<int>>& getSizeDistribution() { return sizeDistribution_; }
+    // Get the local configuration for viewing
+    Configuration* getClusterConfig() { return &clusterConfig_; }
     // Ensures we don't visualise the config before it's ready (still necessary?)
     bool viewingReady{false};
 };

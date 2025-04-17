@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 Team Dissolve and contributors
 
-#include "modules/clustering/gui/clusteringWidget.h"
 #include "gui/render/renderableData1D.h"
 #include "modules/clustering/clustering.h"
+#include "modules/clustering/gui/clusteringWidget.h"
 
 ClusteringModuleWidget::ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve)
     : ModuleWidget(parent, dissolve), module_(module)
 {
-    // Set up cluster configuration viewing
     ui_.setupUi(this);
     ui_.ViewerWidget->setConfiguration(clusterConfiguration_);
 
@@ -47,9 +46,9 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
         refreshing_ = false;
         return;
     }
-    // Set the new configuration and redraw the visualisation. Is there a way to set the style to spheres view from here (lines
-    // arent showing)?
-    clusterConfiguration_ = module_->generateClustersConfig(&dissolve_, module_->getSourceConfig(), displaySize_, displayID_);
+
+    module_->generateClustersConfig(dissolve_, displaySize_, displayID_);
+    clusterConfiguration_ = module_->getClusterConfig();
     ui_.ViewerWidget->setConfiguration(clusterConfiguration_);
     ui_.ViewerWidget->dataModified();
     ui_.ViewerWidget->postRedisplay();
@@ -57,21 +56,26 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
     // Configure the size/mass histograms
     if (updateFlags.isSet(ModuleWidget::RecreateRenderablesFlag) || sizeDist_->renderables().empty() ||
         massDist_->renderables().empty())
-    {
-        buildSizeList();
+    {        
+        Messenger::error("BUILD LIST SHOULD BE UPDATED??????????");
         sizeDist_->clearRenderables();
         massDist_->clearRenderables();
 
         if (sizeDist_->renderables().empty())
-            sizeDist_->createRenderable<RenderableData1D>(std::format("{}//SizeDist", module_->name()),
-                                                          std::format("SizeDist//{}", module_->getSourceConfig()->niceName()),
-                                                          module_->getSourceConfig()->niceName());
+            sizeDist_->createRenderable<RenderableData1D>(
+                std::format("{}//SizeDist", module_->name()),
+                std::format("SizeDist//{}", module_->keywords().getConfiguration("Configuration")->niceName()),
+                module_->keywords().getConfiguration("Configuration")->niceName());
 
         if (massDist_->renderables().empty())
-            massDist_->createRenderable<RenderableData1D>(std::format("{}//MassDist", module_->name()),
-                                                          std::format("MassDist//{}", module_->getSourceConfig()->niceName()),
-                                                          module_->getSourceConfig()->niceName());
+            massDist_->createRenderable<RenderableData1D>(
+                std::format("{}//MassDist", module_->name()),
+                std::format("MassDist//{}", module_->keywords().getConfiguration("Configuration")->niceName()),
+                module_->keywords().getConfiguration("Configuration")->niceName());
     }
+
+    if (!fromBuilder)
+        buildSizeList();
 
     sizeDist_->validateRenderables(dissolve_.processingModuleData());
     massDist_->validateRenderables(dissolve_.processingModuleData());
@@ -80,20 +84,21 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
     sizeDist_->postRedisplay();
     massDist_->postRedisplay();
 
+    fromBuilder = false;
     refreshing_ = false;
 }
 
 void ClusteringModuleWidget::buildSizeList()
 {
     // Produce a list of all the different cluster sizes
-    auto sizeDistribution = module_->getSizeDistribution();
-    ui_.listWidget->clear();
-    ui_.listWidget->addItem("View All");
+    auto &sizeDistribution = module_->getSizeDistribution();
+    ui_.clusterSizeList->clear();
+    ui_.clusterSizeList->addItem("View All");
     for (const auto &[size, _] : sizeDistribution)
     {
-        QListWidgetItem *item = new QListWidgetItem(QString::number(size));
+        auto *item = new QListWidgetItem(QString::number(size));
         item->setFlags(item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        ui_.listWidget->addItem(item);
+        ui_.clusterSizeList->addItem(item);
     }
 }
 
@@ -101,7 +106,7 @@ void ClusteringModuleWidget::buildIDList(QListWidgetItem *item)
 {
     // Produce a list of all the cluster IDs of the selected cluster size
     auto sizeDistribution = module_->getSizeDistribution();
-    ui_.listWidget2->clear();
+    ui_.clusterIDList->clear();
     if (item->text() == "View All")
     {
         displaySize_ = 0;
@@ -109,27 +114,21 @@ void ClusteringModuleWidget::buildIDList(QListWidgetItem *item)
         return;
     }
 
-    ui_.listWidget2->addItem("View All");
+    ui_.clusterIDList->addItem("View All");
     displaySize_ = item->text().toInt();
     for (const auto &ID : sizeDistribution[displaySize_])
     {
-        QListWidgetItem *cell = new QListWidgetItem(QString::number(ID));
+        auto *cell = new QListWidgetItem(QString::number(ID));
         cell->setFlags(cell->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        ui_.listWidget2->addItem(cell);
+        ui_.clusterIDList->addItem(cell);
     }
 }
 
-void ClusteringModuleWidget::on_listWidget_itemClicked(QListWidgetItem *item) { buildIDList(item); }
+void ClusteringModuleWidget::on_clusterSizeList_itemClicked(QListWidgetItem *item) { buildIDList(item); }
 
-void ClusteringModuleWidget::on_listWidget2_itemClicked(QListWidgetItem *item)
+void ClusteringModuleWidget::on_clusterIDList_itemClicked(QListWidgetItem *item)
 {
-    if (item->text() == "View All")
-    {
-        displayID_ = 0;
-        updateControls();
-        return;
-    }
-
-    displayID_ = item->text().toInt();
+    item->text() == "View All" ? displayID_ = 0 : displayID_ = item->text().toInt();
+    fromBuilder = true;
     updateControls();
 }

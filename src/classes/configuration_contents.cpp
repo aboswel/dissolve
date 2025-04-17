@@ -152,7 +152,7 @@ std::shared_ptr<Molecule> Configuration::copyMolecule(const std::shared_ptr<Mole
     // Copy the source molecule's coordinates
     for (const auto *atom : sourceMolecule->atoms())
         addAtom(atom->speciesAtom(), newMolecule, atom->r());
-
+    
     return newMolecule;
 }
 

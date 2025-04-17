@@ -54,7 +54,7 @@ ModuleRegistry::ModuleRegistry()
     registerProducer<BenchmarkModule>(ModuleTypes::Benchmark, "Perform benchmarking on a variety of functions",
                                       "Checks & Tests");
     registerProducer<BraggModule>(ModuleTypes::Bragg, "Calculate Bragg intensities", "Correlation Functions");
-    registerProducer<ClusteringModule>(ModuleTypes::Clustering, "Analyse molecular clustering", "Analysis");
+    registerProducer<ClusteringModule>(ModuleTypes::Clustering, "Analyse clustering between sites", "Analysis");
     registerProducer<CompareModule>(ModuleTypes::Compare, "Compare data sets and calculate errors", "Checks & Tests");
     registerProducer<DAngleModule>(ModuleTypes::DAngle, "Calculate distance/angle maps", "Analysis");
     registerProducer<EnergyModule>(ModuleTypes::Energy, "Calculate the total energy of a Configuration", "Forcefield");

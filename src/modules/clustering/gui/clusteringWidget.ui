@@ -51,7 +51,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QListWidget" name="listWidget">
+               <widget class="QListWidget" name="clusterSizeList">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
                   <horstretch>0</horstretch>
@@ -63,6 +63,12 @@
                   <width>90</width>
                   <height>16777215</height>
                  </size>
+                </property>
+                <property name="editTriggers">
+                 <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+                </property>
+                <property name="selectionMode">
+                 <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
                 </property>
                </widget>
               </item>
@@ -88,7 +94,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QListWidget" name="listWidget2">
+               <widget class="QListWidget" name="clusterIDList">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
                   <horstretch>0</horstretch>
@@ -100,6 +106,12 @@
                   <width>90</width>
                   <height>16777215</height>
                  </size>
+                </property>
+                <property name="editTriggers">
+                 <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+                </property>
+                <property name="selectionMode">
+                 <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
                 </property>
                </widget>
               </item>

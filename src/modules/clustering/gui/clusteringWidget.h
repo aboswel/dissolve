@@ -20,11 +20,12 @@ class ClusteringModuleWidget : public ModuleWidget
     private:
     // Associated Module
     ClusteringModule *module_;
-    // Pointer to cluster config for visualisation (maybe just use the module config?)
+    // Local pointer to the cluster configuration
     Configuration *clusterConfiguration_{nullptr};
     // Integers for which clusters to display
     int displaySize_{0}, displayID_{0};
     bool refreshing_{false};
+    bool fromBuilder{false};
 
     public:
     ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve);
@@ -40,9 +41,9 @@ class ClusteringModuleWidget : public ModuleWidget
     private:
     // Main form declaration
     Ui::ClusteringModuleWidget ui_;
-    DataViewer *sizeDist_, *massDist_;
+    DataViewer *sizeDist_{nullptr}, *massDist_{nullptr};
 
     private Q_SLOTS:
-    void on_listWidget_itemClicked(QListWidgetItem *item);
-    void on_listWidget2_itemClicked(QListWidgetItem *item);
+    void on_clusterSizeList_itemClicked(QListWidgetItem *item);
+    void on_clusterIDList_itemClicked(QListWidgetItem *item);
 };

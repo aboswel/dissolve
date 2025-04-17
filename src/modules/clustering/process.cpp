@@ -3,35 +3,31 @@
 
 #include "analyser/typeDefs.h"
 #include "base/sysFunc.h"
+#include "classes/localMolecule.h"
+#include "data/elements.h"
 #include "generator/box.h"
+#include "generator/copy.h"
 #include "math/regression.h"
 #include "modules/clustering/clustering.h"
 
 bool ClusteringModule::setUp(ModuleContext &moduleContext, Flags<KeywordBase::KeywordSignal> actionSignals)
 {
-    // Existing oldConfigurations in the restart file generate a new tab which is problematic. Only want this to run we've
-    // freshly loaded a save
-    if (!clusterConfig_)
+    // Check user definitions
+    if (!(a_ && b_ && (cutoff_ > 0)))
+        Messenger::error("Cluster definition invalid!");
+ 
+    // If directionality is in play, need to check all is good
+    if (strict_)
     {
-        auto *oldConfig = moduleContext.dissolve().coreData().findConfiguration("clusters");
-        if (oldConfig)
-        {
-            moduleContext.dissolve().coreData().removeConfiguration(oldConfig);
-            Messenger::print("Removed existing cluster configuration");
-        }
+        // At least one of the sites needs to be a 
     }
+    viewingReady = false;
     return true;
 }
 
 Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 {
     auto &moduleData = moduleContext.dissolve().processingModuleData();
-
-    if (!(a_ && b_ && (cutoff_ > 0)))
-    {
-        Messenger::error("Cluster definition invalid!");
-        return ExecutionResult::Failed;
-    }
 
     // Process code
     // Produce NeighbourMap
@@ -40,10 +36,16 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     // Transform SiteObjects to instances ready for the filter function
     SiteSelector selectionA(targetConfiguration_, std::vector<const SpeciesSite *>{a_});
-    const Analyser::SiteVector &siteVectorA = selectionA.sites();
+    const auto &siteVectorA = selectionA.sites();
+
+    if(siteVectorA.empty())
+        Messenger::error("No valid site instances have been found!");
 
     SiteSelector selectionB(targetConfiguration_, std::vector<const SpeciesSite *>{b_});
-    const Analyser::SiteVector &siteVectorB = selectionB.sites();
+    const auto &siteVectorB = selectionB.sites();
+
+    if(siteVectorB.empty())
+        Messenger::error("No valid site instances have been found!");
 
     SiteFilter filterA(targetConfiguration_, siteVectorA);
     std::tie(std::ignore, neighbourMapA) = filterA.filterBySiteProximity(siteVectorB, Range(0.001, cutoff_), 1,
@@ -56,6 +58,22 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         std::tie(std::ignore, neighbourMapB) = filterB.filterBySiteProximity(siteVectorA, Range(0.001, cutoff_), 1, 100);
     }
 
+    // Check the neighbourMap has something in it
+
+    // Run through the neighbour Map and purge neighbours that do not meet H-bond directionality criteria
+    /*
+    if (strict_)
+    {
+        for (auto neighbourMap : {neighbourMapA, neighbourMapB})
+        {
+            for (const auto &[base, neighbours] : neighbourMap)
+            {
+                const auto &O = base->molecule()
+            }
+        }
+    }
+    */
+    // Failed before here
     // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
     // neighbours if exists.
     for (auto neighbourMap : {neighbourMapA, neighbourMapB})
@@ -66,6 +84,9 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
             else
                 neighbourMap_.insert({site, neighbours});
         }
+    
+    if (neighbourMap_.empty())
+        Messenger::error("No neighbours found!");
 
     // ClusterMap generation 2.0
     clusterMap_.clear();
@@ -103,7 +124,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
         clusterMasses_[clusterID] = clusterMass;
     }
-
+    
     // Cluster mass distribution
     massDistribution_.clear();
     for (const auto &[clusterID, clusterMass] : clusterMasses_)
@@ -156,42 +177,32 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     viewingReady = true;
 
-    // Output for debugging
-    if (false)
+    if (saveSizeDist_)
     {
         LineParser parser;
-        std::string filename = std::format("{}.neighbourdata.txt", targetConfiguration_->niceName());
-
-        // Output file for diagnostics
-        if (!parser.openOutput(filename))
-        {
-            Messenger::error("Failed to open output file '{}'.\n", filename);
-            return ExecutionResult::Failed;
-        }
-
-        // Write header with site information
+        parser.openOutput(std::format("{}.sizedist.txt", targetConfiguration_->niceName()));
         parser.writeLineF("# Analysis for sites: {} - {}\n", a_->parent()->name(), b_->parent()->name());
-
-        // Write clusters and other diagnostics...
-        // Now compute the cluster size distribution and output it
-        parser.writeLineF("\n=== Cluster Size Distribution ===\n");
+        parser.writeLineF("\n=== Cluster Size Distribution ===\nCluster Size : no. of clusters\n");
         for (const auto &[clusterSize, mems] : sizeDistribution_)
-            parser.writeLineF("  Cluster Size {} : {} clusters\n", clusterSize, mems.size());
-
-        // Compute mass distribution diagnostic
-        parser.writeLineF("\n=== Cluster Mass Distribution ===\n");
-        for (const auto &[clusterMass, clusterVec] : massDistribution_)
-            for (const auto &cluster : clusterVec)
-                parser.writeLineF("  Cluster Mass {:.3f} : cluster ID: {}\n", clusterMass, cluster);
-
-        // Write radius of gyration diagnostics to output file
-        parser.writeLineF("\n=== Radius of Gyration ===\n");
+            parser.writeLineF("{} : {}\n", clusterSize, mems.size());
+    }
+    if (saveMassDist_)
+    {
+        LineParser parser;
+        parser.openOutput(std::format("{}.massdist.txt", targetConfiguration_->niceName()));
+        parser.writeLineF("# Analysis for sites: {} - {}\n", a_->parent()->name(), b_->parent()->name());
+        parser.writeLineF("\n=== Cluster Mass Distribution ===\nCluster Mass : no. of clusters\n");
+        for (const auto &[clusterMass, mems] : massDistribution_)
+            parser.writeLineF("{:.3f} : {}\n", clusterMass, mems.size());
+    }
+    if (saveRgMass_)
+    {
+        LineParser parser;
+        parser.openOutput(std::format("{}.massRg.txt", targetConfiguration_->niceName()));
+        parser.writeLineF("# Analysis for sites: {} - {}\n", a_->parent()->name(), b_->parent()->name());
+        parser.writeLineF("\n=== Mass - Radius of gyration ===\nCluster Mass : Radii\n");
         for (const auto &[clusterID, radius] : radiusOfGyration_)
-            parser.writeLineF("Cluster {}: {:.3f}\n", clusterID, radius);
-
-        // Write fractal dimension diagnostics to output file
-        parser.writeLineF("\n=== Fractal Dimension ===\n");
-        parser.writeLineF("Fractal dimension: {:.3f}\n", fractalDimension_);
+            parser.writeLineF("{} : {}\n", clusterMasses_[clusterID], radius);
     }
 
     return ExecutionResult::Success;
@@ -209,29 +220,58 @@ void ClusteringModule::buildCluster(const Site *startSite, std::unordered_set<co
     }
 }
 
-Configuration *ClusteringModule::generateClustersConfig(Dissolve *dissolve, Configuration *source, int displaySize,
-                                                        int displayID)
+// Theres something fundamentally wrong with this...
+void ClusteringModule::generateClustersConfig(Dissolve &dissolve, int displaySize, int displayID)
 {
-    // If the config does not exist at all, make it
-    if (!dissolve->coreData().findConfiguration("clusters"))
-    {
-        clusterConfig_ = dissolve->coreData().addConfiguration();
-        clusterConfig_->setName("clusters");
-        clusterConfig_->createBox(source->box()->axisLengths(), source->box()->axisAngles());
-    }
-    // If the configuration exists, empty it
+    if (clusterConfig_.generator().node("clusters"))
+        clusterConfig_.clear();
     else
-        clusterConfig_->empty();
+        clusterConfig_.setName("clusters");
+    
+    clusterConfig_.generator().createRootNode<CopyGeneratorNode>("clusters", targetConfiguration_);
+    clusterConfig_.generate({dissolve.worldPool(), dissolve});
+    clusterConfig_.removeMolecules(clusterConfig_.molecules());
+    
+
     // Display all clusters
     if (displaySize == 0)
     {
         for (const auto &[clusterID, mems] : clusterMap_)
             for (const auto &site : mems)
             {
-                auto copyableMolecule = std::make_shared<Molecule>(*site->molecule());
-                clusterConfig_->copyMolecule(copyableMolecule);
+                /*
+                auto atoms = site->molecule()->atoms();
+                std::vector<Vec3<double>> poss;
+                for (const auto &atom : atoms)
+                {
+                    poss.push_back(atom->r());
+                }
+                return;
+                clusterConfig_.addMolecule(site->parent()->parent(), poss);
+                */
+                auto mol = clusterConfig_.addMolecule(site->parent()->parent());
+                for (auto &&[molAtom, sourceAtom] : zip(mol->atoms(), site->molecule()->atoms()))
+                {
+                    molAtom->setCoordinates(sourceAtom->r());
+                    clusterConfig_.updateAtomLocation(molAtom);
+                }
+                //auto mol = std::const_pointer_cast<Molecule>(site->molecule());
+                //clusterConfig_.copyMolecule(mol);
+                /*
+                LocalMolecule mol;
+                mol.setSpecies(site->parent()->parent())
+
+                // Add the molecules to our configuration
+                for (const auto &instance : molecularSpecies.instances())
+                {
+                auto mol = supercellConfiguration_.addMolecule(sp);
+                for (auto &&[molAtom, instanceAtom] : zip(mol->atoms(), instance.localAtoms()))
+                    molAtom->setCoordinates(instanceAtom.r());
+                }
+                */
             }
     }
+
     // Display all clusters of size displaySize
     else if (displaySize != 0 && displayID == 0)
     {
@@ -239,8 +279,12 @@ Configuration *ClusteringModule::generateClustersConfig(Dissolve *dissolve, Conf
             if (mems.size() == displaySize)
                 for (const auto &site : mems)
                 {
-                    auto copyableMolecule = std::make_shared<Molecule>(*site->molecule());
-                    clusterConfig_->copyMolecule(copyableMolecule);
+                    auto mol = clusterConfig_.addMolecule(site->parent()->parent());
+                    for (auto &&[molAtom, sourceAtom] : zip(mol->atoms(), site->molecule()->atoms()))
+                    {
+                        molAtom->setCoordinates(sourceAtom->r());
+                        clusterConfig_.updateAtomLocation(molAtom);
+                    }
                 }
     }
     // Display cluster with ID displayID
@@ -248,20 +292,24 @@ Configuration *ClusteringModule::generateClustersConfig(Dissolve *dissolve, Conf
     {
         for (const auto &site : clusterMap_[displayID])
         {
-            auto copyableMolecule = std::make_shared<Molecule>(*site->molecule());
-            clusterConfig_->copyMolecule(copyableMolecule);
+            auto mol = clusterConfig_.addMolecule(site->parent()->parent());
+            for (auto &&[molAtom, sourceAtom] : zip(mol->atoms(), site->molecule()->atoms()))
+            {
+                molAtom->setCoordinates(sourceAtom->r());
+                clusterConfig_.updateAtomLocation(molAtom);
+            }
         }
     }
 
-    clusterConfig_->updateObjectRelationships();
-    clusterConfig_->incrementContentsVersion();
+    clusterConfig_.incrementContentsVersion();
+    clusterConfig_.updateObjectRelationships();
 
-    if (clusterConfig_->nAtoms() == 0)
-        Messenger::error("No displayable clusters were found! Tweak min/max values.");
+    if (clusterConfig_.nAtoms() == 0)
+    {
+        Messenger::error("No displayable clusters were found! Tweak cluster definition.");
+    }
     else
-        Messenger::print("clusters config successfully generated");
-
-    return clusterConfig_;
+        Messenger::print("Clusters config generated");
 }
 
 Configuration *ClusteringModule::getSourceConfig() { return targetConfiguration_; }
