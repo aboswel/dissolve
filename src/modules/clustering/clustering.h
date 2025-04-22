@@ -40,7 +40,7 @@ class ClusteringModule : public Module
     // Map of size to no. of clusters of that size
     std::map<int, std::vector<int>> sizeDistribution_{};
     // Map of cluster ID to mass of cluster
-    std::map<int, float> clusterMasses_{};
+    std::map<int, double> clusterMasses_{};
     // Map of mass to vector of cluster IDs (useful for processing)
     std::map<float, std::vector<int>> massDistribution_{};
     // {Site A : {Site B, C ... : Coordination Number for each pair}} where Site A - B, C ... are all the combinations defined
