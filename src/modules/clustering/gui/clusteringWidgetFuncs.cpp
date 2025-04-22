@@ -40,24 +40,20 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
 
     refreshing_ = true;
 
-    // Check eveything is ready
-    if (!module_->viewingReady)
+    if (getNewConfig_ || updateFlags.isSet(ModuleWidget::RecreateRenderablesFlag))
     {
-        refreshing_ = false;
-        return;
+        module_->generateClustersConfig(dissolve_, displaySize_, displayID_);
+        clusterConfiguration_ = module_->getClusterConfig();
+        ui_.ViewerWidget->setConfiguration(clusterConfiguration_);
+        ui_.ViewerWidget->dataModified();
+        ui_.ViewerWidget->postRedisplay();
+        getNewConfig_ = false;
     }
-
-    module_->generateClustersConfig(dissolve_, displaySize_, displayID_);
-    clusterConfiguration_ = module_->getClusterConfig();
-    ui_.ViewerWidget->setConfiguration(clusterConfiguration_);
-    ui_.ViewerWidget->dataModified();
-    ui_.ViewerWidget->postRedisplay();
 
     // Configure the size/mass histograms
     if (updateFlags.isSet(ModuleWidget::RecreateRenderablesFlag) || sizeDist_->renderables().empty() ||
         massDist_->renderables().empty())
-    {        
-        Messenger::error("BUILD LIST SHOULD BE UPDATED??????????");
+    {
         sizeDist_->clearRenderables();
         massDist_->clearRenderables();
 
@@ -74,7 +70,7 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
                 module_->keywords().getConfiguration("Configuration")->niceName());
     }
 
-    if (!fromBuilder)
+    if (!fromBuilder_)
         buildSizeList();
 
     sizeDist_->validateRenderables(dissolve_.processingModuleData());
@@ -84,7 +80,7 @@ void ClusteringModuleWidget::updateControls(const Flags<ModuleWidget::UpdateFlag
     sizeDist_->postRedisplay();
     massDist_->postRedisplay();
 
-    fromBuilder = false;
+    fromBuilder_ = false;
     refreshing_ = false;
 }
 
@@ -110,6 +106,7 @@ void ClusteringModuleWidget::buildIDList(QListWidgetItem *item)
     if (item->text() == "View All")
     {
         displaySize_ = 0;
+        getNewConfig_ = true;
         updateControls();
         return;
     }
@@ -129,6 +126,7 @@ void ClusteringModuleWidget::on_clusterSizeList_itemClicked(QListWidgetItem *ite
 void ClusteringModuleWidget::on_clusterIDList_itemClicked(QListWidgetItem *item)
 {
     item->text() == "View All" ? displayID_ = 0 : displayID_ = item->text().toInt();
-    fromBuilder = true;
+    getNewConfig_ = true;
+    fromBuilder_ = true;
     updateControls();
 }

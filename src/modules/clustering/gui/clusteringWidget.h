@@ -24,8 +24,12 @@ class ClusteringModuleWidget : public ModuleWidget
     Configuration *clusterConfiguration_{nullptr};
     // Integers for which clusters to display
     int displaySize_{0}, displayID_{0};
+    // Standard stuff
     bool refreshing_{false};
-    bool fromBuilder{false};
+    // Prevents selection in ID list forcing size list update
+    bool fromBuilder_{false};
+    // Prevents unnecessary recalculation of clusters config
+    bool getNewConfig_{false};
 
     public:
     ClusteringModuleWidget(QWidget *parent, ClusteringModule *module, Dissolve &dissolve);

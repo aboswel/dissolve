@@ -33,10 +33,6 @@ class ClusteringModule : public Module
     const SpeciesSite *a_{nullptr}, *b_{nullptr};
     // Maximum allowed distance for the two sites to be considered in the same cluster
     double cutoff_{3.0};
-    // Strict (directional) definition
-    bool strict_{false};
-    // Angle constraint for strictness (+- deviation from 180)
-    double angleDev_{20};
     // Symmetric map of all sites to all neighbour sites
     Analyser::SiteMap neighbourMap_{};
     // Map of every member in every cluster
@@ -85,12 +81,8 @@ class ClusteringModule : public Module
     bool setUp(ModuleContext &moduleContext, Flags<KeywordBase::KeywordSignal> actionSignals) override;
     // Generation of the cluster visualisation configuration
     void generateClustersConfig(Dissolve &dissolve, int displaySize, int displayID);
-    // Getter for the target configuration of the module
-    Configuration *getSourceConfig();
     // Get the size distribution
-    std::map<int, std::vector<int>>& getSizeDistribution() { return sizeDistribution_; }
+    std::map<int, std::vector<int>> &getSizeDistribution() { return sizeDistribution_; }
     // Get the local configuration for viewing
-    Configuration* getClusterConfig() { return &clusterConfig_; }
-    // Ensures we don't visualise the config before it's ready (still necessary?)
-    bool viewingReady{false};
+    Configuration *getClusterConfig() { return &clusterConfig_; }
 };
