@@ -3,7 +3,6 @@
 
 #include "analyser/typeDefs.h"
 #include "base/sysFunc.h"
-#include "classes/localMolecule.h"
 #include "data/elements.h"
 #include "generator/box.h"
 #include "generator/copy.h"
@@ -14,7 +13,62 @@ bool ClusteringModule::setUp(ModuleContext &moduleContext, Flags<KeywordBase::Ke
 {
     // Check user definitions
     if (!(a_ && b_ && (cutoff_ > 0)))
-        Messenger::error("Cluster definition invalid!");
+        Messenger::error("Cluster definition invalid! Ensure sites 'a', 'b', and 'cutoff' are defined.");
+
+    // If we have strict bonding, we need to check and determine indice map for hydroxyl group
+    if (strict_)
+    {
+        hydroxylIndexes_.clear(); // Clear map before populating
+
+        for (const auto &s : {a_, b_})
+        {
+            // Site 's' validity is checked by the initial 'if (!(a_ && b_ ...))'
+
+            // For now, we only allow static sites based on a single oxygen
+            if (s->type() != SpeciesSite::SiteType::Static || s->staticOriginAtoms().size() != 1) // Check size first
+            {
+                Messenger::error("For directional hydrogen bonding, site must be a static type based on a single origin atom.");
+                return false;
+            }
+
+            auto o = s->staticOriginAtoms()[0];
+            // Check if the origin atom pointer is valid
+            if (!o)
+            {
+                Messenger::error("For directional hydrogen bonding, the origin atom for site is null.");
+                return false;
+            }
+            // Check if the origin atom is Oxygen
+            if (o->Z() != Elements::O)
+            {
+                Messenger::error("For directional hydrogen bonding, the static origin atom for site must be an Oxygen.");
+                return false;
+            }
+
+            // Now we find the hydroxyl hydrogens and add them to the map
+            for (const auto &bond : o->bonds())
+            {
+                // Assuming bond.get() returns a valid reference or handle
+                for (const auto &atom : bond.get().atoms())
+                {
+                    // Check if the bonded atom pointer is valid before dereferencing
+                    if (!atom)
+                    {
+                        Messenger::error(
+                            "Null atom pointer encountered in bonds of atom during strict bonding setup for site. Skipping.");
+                        continue; // Skip this null atom pointer
+                    }
+                    if (atom->Z() == Elements::H)
+                    {
+                        hydroxylIndexes_[s].emplace(atom->index());
+                    }
+                }
+            }
+        }
+        for (const auto &[site, indexes] : hydroxylIndexes_)
+            for (const auto &index : indexes)
+                Messenger::print(std::format("\nSite {} is partnered to hydroxyl hydrogen index {}", site->name(), index));
+    }
 
     return true;
 }
@@ -47,7 +101,9 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
     // neighbours if exists.
+
     for (auto neighbourMap : {neighbourMapA, neighbourMapB})
+    {
         for (const auto &[site, neighbours] : neighbourMap)
         {
             if (neighbourMap_.contains(site))
@@ -55,6 +111,54 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
             else
                 neighbourMap_.insert({site, neighbours});
         }
+    }
+
+    // Now if we're looking at directionality, we check each site and it's neighbours
+    if (strict_)
+    {
+        Analyser::SiteMap tempMap;
+        const auto box = targetConfiguration_->box();
+        for (auto &[site, neighbours] : neighbourMap_)
+        {
+            const auto &hIdx = hydroxylIndexes_[site->parent()];
+            if (hIdx.empty())
+            {
+                continue; // No hydrogens to check for this SpeciesSite
+            }
+
+            // Iterate neighbours
+            for (auto it = neighbours.begin(); it != neighbours.end();)
+            {
+                auto oOVec = box->minimumVector(site->origin(), std::get<0>(*it)->origin());
+                bool keep = false;
+
+                for (const auto &h : hIdx)
+                {
+                    // Get the relevant vectors
+                    auto oHVec = box->minimumVector(site->origin(), site->molecule()->atom(h)->r());
+                    auto angle = box->angleInDegrees(oOVec / oOVec.magnitude(), oHVec / oHVec.magnitude());
+
+                    // Make sure we have the smallest angle possible
+                    if (360.0 - angle < angle)
+                        angle = 360.0 - angle;
+
+                    if (angle <= angleDev_)
+                        keep = true;
+                }
+
+                // Add to the temp map symmetrically. Not paying attention to site indexes but I suppose this method tags donors
+                // with index = 0 (bar actual 0 index site)
+                if (keep)
+                {
+                    tempMap[site].emplace_back(*it);
+                    tempMap[std::get<0>(*it)].emplace_back(Analyser::SiteData(site, 0));
+                }
+
+                it++;
+            }
+        }
+        neighbourMap_ = tempMap;
+    }
 
     if (neighbourMap_.empty())
         Messenger::error("No neighbours found!");
@@ -169,6 +273,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         LineParser parser;
         parser.openOutput(std::format("{}.massRg.txt", targetConfiguration_->niceName()));
         parser.writeLineF("# Analysis for sites: {} - {}\n", a_->parent()->name(), b_->parent()->name());
+        parser.writeLineF("# Fractal dimension: {}", fractalDimension_);
         parser.writeLineF("\n=== Mass - Radius of gyration ===\nCluster Mass : Radii\n");
         for (const auto &[clusterID, radius] : radiusOfGyration_)
             parser.writeLineF("{} : {}\n", clusterMasses_[clusterID], radius);
@@ -255,4 +360,56 @@ void ClusteringModule::generateClustersConfig(Dissolve &dissolve, int displaySiz
     }
     else
         Messenger::print("Cluster visualisation generated");
+}
+
+void ClusteringModule::calculateCN(int displaySize, int displayID)
+{
+    std::map<const SpeciesSite *, int> instances;
+    clusterSpeciesCoordNo_.clear();
+
+    if (displaySize == 0)
+    {
+        // Start iterating through the cluster map.
+        for (auto const &[_, mems] : clusterMap_)
+        {
+            // Iterate through each member of the cluster
+            for (auto const &mem : mems)
+            {
+                // For each species found, increment the total number of that species by one.
+                instances[mem->parent()]++;
+
+                // Find the member in the neighbour map,
+                for (auto const &[memNbr, index] : neighbourMap_[mem])
+                    clusterSpeciesCoordNo_[mem->parent()][memNbr->parent()]++;
+            }
+        }
+    }
+    if (displaySize != 0 && displayID == 0)
+    {
+        // Same as above but only for given size
+        for (const auto &[clusterID, mems] : clusterMap_)
+            if (mems.size() == displaySize)
+                for (auto const &mem : mems)
+                {
+                    instances[mem->parent()]++;
+                    for (auto const &[memNbr, index] : neighbourMap_[mem])
+                        clusterSpeciesCoordNo_[mem->parent()][memNbr->parent()]++;
+                }
+    }
+    else if (displaySize != 0 && displayID != 0)
+    {
+        // Just the given clusterID
+        for (auto const &mem : clusterMap_[displayID])
+        {
+            instances[mem->parent()]++;
+            for (auto const &[memNbr, index] : neighbourMap_[mem])
+                clusterSpeciesCoordNo_[mem->parent()][memNbr->parent()]++;
+        }
+    }
+    // Average the coordination numbers
+    for (const auto &[siteA, num] : instances)
+    {
+        for (const auto &[siteB, coordNo] : clusterSpeciesCoordNo_[siteA])
+            clusterSpeciesCoordNo_[siteA][siteB] /= num;
+    }
 }
