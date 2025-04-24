@@ -13,61 +13,50 @@ bool ClusteringModule::setUp(ModuleContext &moduleContext, Flags<KeywordBase::Ke
 {
     // Check user definitions
     if (!(a_ && b_ && (cutoff_ > 0)))
-        Messenger::error("Cluster definition invalid! Ensure sites 'a', 'b', and 'cutoff' are defined.");
+        Messenger::error("Cluster definition invalid! Set both sites and a positive cutoff.");
 
-    // If we have strict bonding, we need to check and determine indice map for hydroxyl group
+    // If we have strict bonding, we need to check and determine index map for hydroxyl group
     if (strict_)
     {
-        hydroxylIndexes_.clear(); // Clear map before populating
-
+        hydroxylIndexes_.clear();
         for (const auto &s : {a_, b_})
         {
-            // Site 's' validity is checked by the initial 'if (!(a_ && b_ ...))'
-
-            // For now, we only allow static sites based on a single oxygen
-            if (s->type() != SpeciesSite::SiteType::Static || s->staticOriginAtoms().size() != 1) // Check size first
+            // Do some checks. For now, requiring the site to be static.
+            if (s->type() != SpeciesSite::SiteType::Static || s->staticOriginAtoms().size() != 1)
             {
                 Messenger::error("For directional hydrogen bonding, site must be a static type based on a single origin atom.");
                 return false;
             }
-
             auto o = s->staticOriginAtoms()[0];
-            // Check if the origin atom pointer is valid
             if (!o)
             {
-                Messenger::error("For directional hydrogen bonding, the origin atom for site is null.");
+                Messenger::error("The origin atom for site is inaccessible.");
                 return false;
             }
-            // Check if the origin atom is Oxygen
             if (o->Z() != Elements::O)
             {
                 Messenger::error("For directional hydrogen bonding, the static origin atom for site must be an Oxygen.");
                 return false;
             }
-
-            // Now we find the hydroxyl hydrogens and add them to the map
+            // Find the hydroxyl hydrogens and add index to the map
             for (const auto &bond : o->bonds())
-            {
-                // Assuming bond.get() returns a valid reference or handle
                 for (const auto &atom : bond.get().atoms())
                 {
-                    // Check if the bonded atom pointer is valid before dereferencing
                     if (!atom)
                     {
-                        Messenger::error(
-                            "Null atom pointer encountered in bonds of atom during strict bonding setup for site. Skipping.");
-                        continue; // Skip this null atom pointer
+                        Messenger::error("Inaccessible bond partner found, skipping...");
+                        continue;
                     }
                     if (atom->Z() == Elements::H)
-                    {
                         hydroxylIndexes_[s].emplace(atom->index());
-                    }
                 }
-            }
         }
-        for (const auto &[site, indexes] : hydroxylIndexes_)
-            for (const auto &index : indexes)
-                Messenger::print(std::format("\nSite {} is partnered to hydroxyl hydrogen index {}", site->name(), index));
+        // Complain if we don't find any valid hydrogens
+        if (hydroxylIndexes_.empty())
+        {
+            Messenger::error("Failed to find hydroxyl hydrogens - check site set-up!");
+            return false;
+        }
     }
 
     return true;
@@ -101,9 +90,7 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
 
     // Combining the neighbour maps into a single map. Because keys may already exist, need to check for them and add
     // neighbours if exists.
-
     for (auto neighbourMap : {neighbourMapA, neighbourMapB})
-    {
         for (const auto &[site, neighbours] : neighbourMap)
         {
             if (neighbourMap_.contains(site))
@@ -111,7 +98,6 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
             else
                 neighbourMap_.insert({site, neighbours});
         }
-    }
 
     // Now if we're looking at directionality, we check each site and it's neighbours
     if (strict_)
@@ -121,17 +107,15 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
         for (auto &[site, neighbours] : neighbourMap_)
         {
             const auto &hIdx = hydroxylIndexes_[site->parent()];
+            // Check the site is hydroxyl
             if (hIdx.empty())
-            {
-                continue; // No hydrogens to check for this SpeciesSite
-            }
+                continue;
 
             // Iterate neighbours
             for (auto it = neighbours.begin(); it != neighbours.end();)
             {
                 auto oOVec = box->minimumVector(site->origin(), std::get<0>(*it)->origin());
                 bool keep = false;
-
                 for (const auto &h : hIdx)
                 {
                     // Get the relevant vectors
@@ -145,7 +129,6 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                     if (angle <= angleDev_)
                         keep = true;
                 }
-
                 // Add to the temp map symmetrically. Not paying attention to site indexes but I suppose this method tags donors
                 // with index = 0 (bar actual 0 index site)
                 if (keep)
@@ -153,7 +136,6 @@ Module::ExecutionResult ClusteringModule::process(ModuleContext &moduleContext)
                     tempMap[site].emplace_back(*it);
                     tempMap[std::get<0>(*it)].emplace_back(Analyser::SiteData(site, 0));
                 }
-
                 it++;
             }
         }
@@ -294,7 +276,6 @@ void ClusteringModule::buildCluster(const Site *startSite, std::unordered_set<co
     }
 }
 
-// This ends up running (at least) four times after each iteration?
 void ClusteringModule::generateClustersConfig(Dissolve &dissolve, int displaySize, int displayID)
 {
     if (clusterConfig_.generator().node("clusters"))
@@ -302,7 +283,7 @@ void ClusteringModule::generateClustersConfig(Dissolve &dissolve, int displaySiz
     else
         clusterConfig_.setName("clusters");
 
-    // Molecule transfer only works with a generator
+    // Molecule transfer only works with a generator?
     clusterConfig_.generator().createRootNode<CopyGeneratorNode>("clusters", targetConfiguration_);
     clusterConfig_.generate({dissolve.worldPool(), dissolve});
     clusterConfig_.removeMolecules(clusterConfig_.molecules());
@@ -355,9 +336,7 @@ void ClusteringModule::generateClustersConfig(Dissolve &dissolve, int displaySiz
     clusterConfig_.updateObjectRelationships();
 
     if (clusterConfig_.nAtoms() == 0)
-    {
         Messenger::error("No clusters!");
-    }
     else
         Messenger::print("Cluster visualisation generated");
 }
@@ -408,8 +387,6 @@ void ClusteringModule::calculateCN(int displaySize, int displayID)
     }
     // Average the coordination numbers
     for (const auto &[siteA, num] : instances)
-    {
         for (const auto &[siteB, coordNo] : clusterSpeciesCoordNo_[siteA])
             clusterSpeciesCoordNo_[siteA][siteB] /= num;
-    }
 }
