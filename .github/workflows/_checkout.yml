@@ -4,6 +4,9 @@ description: Checks out the source and packages the source as an artifact for us
 on:
   workflow_call:
     inputs:
+      msvcVersion:
+        type: string
+        default: 14.41.17.11
       qtVersion:
         type: string
         default: 6.4.2
@@ -59,6 +62,9 @@ on:
       conanHash:
         description: "Hash of the current conanfile"
         value: ${{ jobs.Checkout.outputs.conanHash }}
+      msvcVersion:
+        description: "Version of MSVC required by the project"
+        value: ${{ jobs.Checkout.outputs.msvcVersion }}
 
 jobs:
 
@@ -70,6 +76,7 @@ jobs:
       currentVersionMinor: ${{ steps.authVersion.outputs.currentVersionMinor }}
       currentVersionPatch: ${{ steps.authVersion.outputs.currentVersionPatch }}
       currentShortHash: ${{ steps.authVersion.outputs.currentShortHash }}
+      msvcVersion: ${{ steps.versions.outputs.msvcVersion }}
       qtVersion: ${{ steps.versions.outputs.qtVersion }}
       antlrVersion: ${{ steps.versions.outputs.antlrVersion }}
       hugoVersion: ${{ steps.versions.outputs.hugoVersion }}
@@ -100,6 +107,8 @@ jobs:
 
           ANTLR_VERSION=$(cat ${{ inputs.conanfile }}  | sed -n -e 's%^.*antlr4-cppruntime/%%p')
           echo "antlrVersion=${ANTLR_VERSION}" >> $GITHUB_OUTPUT
+
+          echo "msvcVersion=${{ inputs.msvcVersion }}" >> $GITHUB_OUTPUT
 
       - name: Get Hashes
         id: hashes

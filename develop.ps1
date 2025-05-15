@@ -3,25 +3,34 @@
         Script to install dependencies for Dissolve development environment in Visual Studio.
     .DESCRIPTION
         Installs the following dependencies for Dissolve (separate and prior to Conan-managed packages):
+            - Python 3.12 (unless stated otherwise)
+            - CMake 3.x
+            - ninja
+            - pkgconfiglite
             - Qt6 <VERSION>
             - Freetype
             - FTGL
             - Antlr4 (Java backend)
-            - Java JDK
+            - Java JDK (latest)
         
         These packages are installed into a folder called 'dependencies'.
     .PARAMETER qtVersion
         Qt version to install. Defaults to existing system Qt6 installation if none specified.
+    .PARAMETER pythonPath
+        Path to a Python executable.
+    .PARAMETER forcePythonVersion
+        Force installation of a given Python version.
     .PARAMETER antlrVersion
         ANTLR version to install. Defaults to ANTLR 4.13.1.
     .PARAMETER release
         Flag - install packages for release, otherwise debug.
-
 #>
 
 param (
     [string]$qtVersion,
-    [string]$antlrVersion = "4.13.1", 
+    [string]$pythonPath,
+    [string]$forcePythonVersion,
+    [string]$antlrVersion = "4.13.1",
     [switch]$release = $false
 )
 
@@ -56,7 +65,8 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocola
 Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
 
 Write-Host "Installing key dependencies with Chocolatey... " @info_colors
-choco install -y ninja pkgconfiglite cmake
+choco install -y ninja pkgconfiglite
+choco install -y cmake --version=3.30.1 --force
 
 # Find git, install if not found
 try {
@@ -68,28 +78,46 @@ try {
 }
 
 # Find python, install if not found
-try {
-    & "python" --version
-    Write-Output "Found system Python..." @info_colors
-    $pythonVersion = $(python -c "import sys; v = sys.version_info; print(v.major == 3, v.minor == 12)")
-    $versionParts = $pythonVersion -split " "
-    if (-not ($versionParts[0] -eq "True" -and $versionParts[1] -eq "True")) {
-        Write-Output "System Python is version $(python --version) and it is recommended to be == 3.12 - installing with Chocolatey..." @info_colors
-        choco install -y python --version=3.12.0
+if (-not [string]::IsNullOrEmpty($pythonPath))
+{
+    Write-Output "Using Python with path $pythonPath..." @info_colors
+    $python = $pythonPath
+}
+else
+{
+    if (-not [string]::IsNullOrEmpty($forcePythonVersion))
+    {
+        Write-Output "Installing requested Python version $forcePythonVersion..." @info_colors
+        choco install -y python --version=$forcePythonVersion --force
     }
-} catch {
-    Write-Output "Could not find system Python - installing with Chocolatey..." @info_colors
-    choco install -y python --version=3.12.0
+    else
+    {
+        try {
+            & "python" --version
+            Write-Output "Found system Python..." @info_colors
+            $pythonVersion = $(python -c "import sys; v = sys.version_info; print(v.major == 3, v.minor == 12)")
+            $versionParts = $pythonVersion -split " "
+            if (-not ($versionParts[0] -eq "True" -and $versionParts[1] -eq "True")) {
+                Write-Output "System Python is version $(python --version) and it is recommended to be version == 3.12 - installing with Chocolatey..." @info_colors
+                choco install -y python --version=3.12.0
+            }
+        } catch {
+            Write-Output "Could not find system Python - installing with Chocolatey..." @info_colors
+            choco install -y python --version=3.12.0
+        }
+    }
+
+    $python = "python"
 }
 
 refreshenv
 
 # Setup Python packages
-Write-Host "Creating a local Python virtual environment... " @info_colors
-python -m venv msvc-env
+Write-Host "Creating a local Python virtual environment with $(& $python --version)... " @info_colors
+& $python -m venv msvc-env
 
 Write-Host "Checking Python compiler type... " @info_colors
-if ($(python -c "import sys; print(sys.version)") -match "MSC v\.\d+") 
+if ($(& $python -c "import sys; print(sys.version)") -match "MSC v\.\d+")
 { 
     Write-Host " ...Python compiler type evaluated to MSC" @info_colors
     $pythonEnvSourceDir = "Scripts"
@@ -106,8 +134,8 @@ Write-Host "Activating Python virtual environment... " @info_colors
 & $activate
 
 Write-Host "Installing Python packages... " @info_colors
-python -m pip install --upgrade pip
-python -m pip install aqtinstall conan==1.*
+& $python -m pip install --upgrade pip
+& $python -m pip install aqtinstall conan==1.*
 
 $systemPath = [Environment]::GetEnvironmentVariable("PATH", [EnvironmentVariableTarget]::Machine)
 
@@ -122,8 +150,8 @@ if (-not [string]::IsNullOrEmpty($qtVersion))
     $qtInstallationDir = Join-Path -Path $dependencies -ChildPath "qt"
     New-Item -ItemType Directory -Path $qtInstallationDir -ErrorAction SilentlyContinue
 
-    Write-Host "Installing Qt6... " @info_colors
-    aqt install-qt --outputdir $qtInstallationDir windows desktop $qtVersion win64_msvc2019_64 -m all
+    Write-Host "Installing Qt6 using aqt with $(& $python --version)... " @info_colors
+    & $python -m aqt install-qt --outputdir $qtInstallationDir windows desktop $qtVersion win64_msvc2019_64 -m all
 
     # Export Qt6_DIR to system environment variables
     $qt6Dir = Join-Path -Path "$projectDir\$dependencies" -ChildPath "qt\$qtVersion\msvc2019_64"
@@ -294,9 +322,25 @@ Move-Item -Path $antlrOutput -Destination $antlrExePath
 Set-Location -Path $projectDir
 
 Write-Host "Setting up Conan profile... " @info_colors
-conan profile new default --detect
-conan profile update settings.compiler="Visual Studio" default
-conan profile update settings.compiler.version=17 default
+
+try {
+    $conanVersion = conan --version
+    Write-Output "Found conan version $conanVersion..."
+
+    $conan = "conan"
+} catch {
+    Write-Output "Could not find conan, adding Python scripts to path..." @info_colors
+    $scripts = & $python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+    $systemPath = [Environment]::GetEnvironmentVariable("PATH", [EnvironmentVariableTarget]::Machine)
+    [Environment]::SetEnvironmentVariable("PATH", "$scripts;$systemPath", [EnvironmentVariableTarget]::Machine)
+    Write-Host "Python scripts path at location $scripts added to system PATH." @info_colors
+
+    $conan = "$scripts/conan.exe"
+}
+
+& $conan profile new default --detect
+& $conan profile update settings.compiler="Visual Studio" default
+& $conan profile update settings.compiler.version=17 default
 
 # Generate Cmake user presets JSON for MSVC Cmake configurations
 $out = Join-Path -Path $projectDir -ChildPath "build"
